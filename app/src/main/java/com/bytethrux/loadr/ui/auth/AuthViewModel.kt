@@ -15,8 +15,11 @@ data class AuthUiState(
     val isLoading: Boolean = false,
     val isLoggedIn: Boolean = false,
     val errorMessage: String? = null,
-    val token: String? = null
+    val token: String? = null,
+    val username: String? = null
 )
+
+
 
 class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
 
@@ -40,7 +43,8 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
 
             when (val result = repository.login(username, password)) {
                 is AuthResult.Success -> {
-                    _uiState.update { it.copy(isLoading = false, isLoggedIn = true) }
+//                    _uiState.update { it.copy(isLoading = false, isLoggedIn = true) }
+                    _uiState.update { it.copy(isLoading = false, isLoggedIn = true, username = username) }
                 }
                 is AuthResult.Error -> {
                     _uiState.update { it.copy(isLoading = false, errorMessage = result.message) }
