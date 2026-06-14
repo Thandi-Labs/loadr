@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -21,14 +22,21 @@ import androidx.compose.ui.text.input.*
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.bytethrux.loadr.ui.auth.AuthViewModel
 import com.bytethrux.loadr.ui.theme.*
+import kotlinx.coroutines.delay
 
 @Composable
-fun LoginView(onLoginSuccess: () -> Unit) {
+fun LoginView(onLoginSuccess: () -> Unit, viewModel: AuthViewModel) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
-    var isLoading by remember { mutableStateOf(false) }
+
+    LaunchedEffect(uiState.isLoggedIn) {
+        if (uiState.isLoggedIn) onLoginSuccess()
+    }
 
     Column(
         modifier = Modifier
@@ -105,6 +113,23 @@ fun LoginView(onLoginSuccess: () -> Unit) {
                 Text("Sign in to your agent account", fontSize = 13.sp, color = LoadrSlate)
             }
 
+            // Error Message
+            uiState.errorMessage?.let { error ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color(0xFF2A1018))
+                        .padding(12.dp)
+                ) {
+                    Text(error, color = LoadrRed, fontSize = 13.sp)
+                }
+                LaunchedEffect(error) {
+                    delay(3000)
+                    viewModel.clearError()
+                }
+            }
+
             // Username field
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("Username", fontSize = 11.sp, color = LoadrSlate, letterSpacing = 0.5.sp)
@@ -176,16 +201,15 @@ fun LoginView(onLoginSuccess: () -> Unit) {
             Button(
                 onClick = {
                     if (username.isNotEmpty() && password.isNotEmpty()) {
-                        isLoading = true
-                        onLoginSuccess()
+                        viewModel.login(username, password)
                     }
                 },
                 modifier = Modifier.fillMaxWidth().height(50.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = LoadrGreen),
-                enabled = username.isNotEmpty() && password.isNotEmpty() && !isLoading
+                enabled = username.isNotEmpty() && password.isNotEmpty() && !uiState.isLoading
             ) {
-                if (isLoading) {
+                if (uiState.isLoading) {
                     CircularProgressIndicator(modifier = Modifier.size(20.dp), color = LoadrNavy, strokeWidth = 2.dp)
                 } else {
                     Text("Sign in", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = LoadrNavy)
