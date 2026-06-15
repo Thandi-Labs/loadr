@@ -9,7 +9,7 @@ object RetrofitClient {
 
     // Use 10.0.2.2 for Android Emulator → maps to host machine localhost
     // Use your actual LAN IP (e.g. 192.168.x.x) for physical device
-    private const val BASE_URL = "http://192.168.0.102:8000/"
+    private const val BASE_URL = "https://loadrd-fastapi.onrender.com/"
 
     private val loggingInterceptor = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BODY
