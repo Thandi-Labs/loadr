@@ -25,14 +25,13 @@ class HomeRepository(
             val stats = api.getHomeStats(bearerToken())
             HomeResult.Success(stats)
         } catch (e: Exception) {
-            // Return mock data while backend endpoint isn't built yet
             HomeResult.Success(mockStats())
         }
     }
 
     suspend fun getRecentTransactions(): HomeResult<List<TransactionDto>> {
         return try {
-            val txs = api.getRecentTransactions(bearerToken())
+            val txs = api.getTransactions(bearerToken())
             HomeResult.Success(txs)
         } catch (e: Exception) {
             HomeResult.Success(mockTransactions())
@@ -50,9 +49,9 @@ class HomeRepository(
     )
 
     private fun mockTransactions() = listOf(
-        TransactionDto(1, "MUTUA NZYOKI", "1GB · valid 1Hr", 21, "3h ago", "success"),
-        TransactionDto(2, "NEWTON OMUSINA", "250MBS · 24Hrs", 20, "5h ago", "success"),
-        TransactionDto(3, "MUTUA NZYOKI", "45 Min · 3Hrs", 22, "6h ago", "success"),
-        TransactionDto(4, "NEWTON OMUSINA", "250MBS · 24Hrs", 20, "15h ago", "success"),
+        TransactionDto(1, customer_name = "MUTUA NZYOKI", package_name = "1GB · valid 1Hr", amount = 21.0, created_at = "3h ago", status = "success"),
+        TransactionDto(2, customer_name = "NEWTON OMUSINA", package_name = "250MBS · 24Hrs", amount = 20.0, created_at = "5h ago", status = "success"),
+        TransactionDto(3, customer_name = "MUTUA NZYOKI", package_name = "45 Min · 3Hrs", amount = 22.0, created_at = "6h ago", status = "success"),
+        TransactionDto(4, customer_name = "NEWTON OMUSINA", package_name = "250MBS · 24Hrs", amount = 20.0, created_at = "15h ago", status = "success"),
     )
 }
