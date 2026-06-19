@@ -65,7 +65,7 @@ interface ApiService {
         @Field("password") password: String
     ): TokenResponse
 
-    @GET("transactions")
+    @GET("transactions/")
     suspend fun getTransactions(
         @Header("Authorization") token: String
     ): List<TransactionDto>
@@ -95,6 +95,12 @@ interface ApiService {
 
     @PUT("offers/deactivate/{id}")
     suspend fun deactivateOffer(
+        @Header("Authorization") token: String,
+        @Path("id") id: Int
+    )
+
+    @PUT("offers/activate/{id}")
+    suspend fun activateOffer(
         @Header("Authorization") token: String,
         @Path("id") id: Int
     )

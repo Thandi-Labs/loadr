@@ -52,7 +52,16 @@ class OffersRepository(
             api.deactivateOffer(bearerToken(), id)
             OffersResult.Success(Unit)
         } catch (e: Exception) {
-            OffersResult.Error(e.message ?: "Failed to toggle offer status")
+            OffersResult.Error(e.message ?: "Failed to deactivate offer")
+        }
+    }
+
+    suspend fun activateOffer(id: Int): OffersResult<Unit> {
+        return try {
+            api.activateOffer(bearerToken(), id)
+            OffersResult.Success(Unit)
+        } catch (e: Exception) {
+            OffersResult.Error(e.message ?: "Failed to activate offer")
         }
     }
 

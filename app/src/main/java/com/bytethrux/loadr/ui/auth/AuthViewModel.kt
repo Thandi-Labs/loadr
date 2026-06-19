@@ -8,6 +8,7 @@ import com.bytethrux.loadr.data.repository.AuthResult
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -27,11 +28,16 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
     val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
 
     init {
-        // On launch, check if a token already exists → auto-login
         viewModelScope.launch {
-            repository.savedToken.collect { token ->
-                if (token != null) {
-                    _uiState.update { it.copy(isLoggedIn = true, token = token) }
+            combine(repository.savedToken, repository.savedUsername) { token, username ->
+                token to username
+            }.collect { (token, username) ->
+                _uiState.update {
+                    if (token != null) {
+                        it.copy(isLoggedIn = true, token = token, username = username)
+                    } else {
+                        AuthUiState()
+                    }
                 }
             }
         }

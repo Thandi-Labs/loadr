@@ -106,7 +106,12 @@ class OffersViewModel(private val repository: OffersRepository) : ViewModel() {
     fun toggleOfferStatus(offer: OfferDto) {
         viewModelScope.launch {
             _uiState.update { it.copy(isActionInProgress = true) }
-            when (val result = repository.deactivateOffer(offer.id)) {
+            val result = if (offer.active) {
+                repository.deactivateOffer(offer.id)
+            } else {
+                repository.activateOffer(offer.id)
+            }
+            when (result) {
                 is OffersResult.Success -> {
                     _eventFlow.emit(OffersUiEvent.ShowSnackbar(
                         if (offer.active) "Offer deactivated" else "Offer activated"

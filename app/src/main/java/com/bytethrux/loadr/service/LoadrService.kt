@@ -51,6 +51,7 @@ class LoadrService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        RetrofitClient.initialize(TokenDataStore(applicationContext))
         createChannel()
         startForeground(NOTIFICATION_ID, buildNotification("Loadr - Ready"))
     }

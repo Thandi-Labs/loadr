@@ -329,6 +329,7 @@ private fun DrawScope.drawCommissionChart(
     days: List<String>,
     progress: Float
 ) {
+    if (values.size < 2) return
     val w = size.width
     val h = size.height - 20.dp.toPx()  // reserve bottom for labels
     val stepX = w / (values.size - 1).toFloat()

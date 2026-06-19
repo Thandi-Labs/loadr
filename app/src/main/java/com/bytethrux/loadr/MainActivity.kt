@@ -18,14 +18,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bytethrux.loadr.data.local.TokenDataStore
 import com.bytethrux.loadr.data.network.RetrofitClient
 import com.bytethrux.loadr.data.repository.AuthRepository
+import com.bytethrux.loadr.data.repository.HomeRepository
+import com.bytethrux.loadr.data.repository.OffersRepository
 import com.bytethrux.loadr.ui.auth.AuthViewModel
 import com.bytethrux.loadr.ui.home.HomeScreen
 import com.bytethrux.loadr.ui.home.HomeViewModel
 import com.bytethrux.loadr.ui.offers.OffersScreen
 import com.bytethrux.loadr.ui.offers.OffersViewModel
 import com.bytethrux.loadr.ui.theme.LoadrTheme
-import com.bytethrux.loadr.data.repository.HomeRepository
-import com.bytethrux.loadr.data.repository.OffersRepository
 import kotlin.getValue
 
 class MainActivity : ComponentActivity() {
@@ -51,6 +51,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        RetrofitClient.initialize(tokenDataStore)
 
         permissionLauncher.launch(
             arrayOf(
