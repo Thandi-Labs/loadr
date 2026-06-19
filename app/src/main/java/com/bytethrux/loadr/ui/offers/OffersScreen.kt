@@ -37,6 +37,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.TabRowDefaults
@@ -46,6 +48,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -54,6 +57,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -76,6 +80,18 @@ fun OffersScreen(
     onBackClick: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+    
+    LaunchedEffect(Unit) {
+        viewModel.eventFlow.collect { event ->
+            when (event) {
+                is OffersUiEvent.ShowSnackbar -> {
+                    snackbarHostState.showSnackbar(event.message)
+                }
+            }
+        }
+    }
+
     var showCreateDialog by remember { mutableStateOf(false) }
     var offerToEdit by remember { mutableStateOf<OfferDto?>(null) }
     var selectedTabIndex by remember { mutableIntStateOf(0) }
@@ -88,6 +104,7 @@ fun OffersScreen(
 
     Scaffold(
         containerColor = LoadrNavy,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             Column {
                 TopAppBar(
@@ -139,31 +156,52 @@ fun OffersScreen(
             }
         }
     ) { paddingValues ->
-        if (uiState.isLoading) {
-            Box(Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = LoadrGreen)
-            }
-        } else {
-            val filteredOffers = uiState.offers.filter { it.category == currentType }
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(paddingValues),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                if (filteredOffers.isEmpty()) {
-                    item {
-                        Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
-                            Text("No ${tabs[selectedTabIndex]} offers found", color = LoadrSlate)
+        Box(modifier = Modifier.padding(paddingValues)) {
+            when {
+                uiState.isLoading -> {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(color = LoadrGreen)
+                    }
+                }
+                uiState.errorMessage != null -> {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(uiState.errorMessage ?: "Unknown error", color = LoadrRed)
+                    }
+                }
+                else -> {
+                    val filteredOffers = uiState.offers.filter { it.category == currentType }
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        if (filteredOffers.isEmpty()) {
+                            item {
+                                Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
+                                    Text("No ${tabs[selectedTabIndex]} offers found", color = LoadrSlate)
+                                }
+                            }
+                        }
+                        items(filteredOffers) { offer ->
+                            OfferItem(
+                                offer = offer,
+                                onToggleStatus = { viewModel.toggleOfferStatus(offer) },
+                                onEdit = { offerToEdit = offer },
+                                onDelete = { viewModel.deleteOffer(offer.id) }
+                            )
                         }
                     }
                 }
-                items(filteredOffers) { offer ->
-                    OfferItem(
-                        offer = offer,
-                        onToggleStatus = { viewModel.toggleOfferStatus(offer) },
-                        onEdit = { offerToEdit = offer },
-                        onDelete = { viewModel.deleteOffer(offer.id) }
-                    )
+            }
+            
+            if (uiState.isActionInProgress) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.3f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = LoadrGreen)
                 }
             }
         }
@@ -173,8 +211,8 @@ fun OffersScreen(
         OfferDialog(
             initialType = currentType,
             onDismiss = { showCreateDialog = false },
-            onConfirm = { name, desc, price, type, ussd ->
-                viewModel.createOffer(name, desc, price, type, ussd)
+            onConfirm = { name, price, type, ussd ->
+                viewModel.createOffer(name, price, type, ussd)
                 showCreateDialog = false
             }
         )
@@ -184,7 +222,7 @@ fun OffersScreen(
         OfferDialog(
             offer = offer,
             onDismiss = { offerToEdit = null },
-            onConfirm = { name, desc, price, type, ussd ->
+            onConfirm = { name, price, type, ussd ->
                 viewModel.updateOffer(offer.copy(offer_name = name, amount = price, category = type, ussd = ussd))
                 offerToEdit = null
             }
@@ -249,13 +287,14 @@ private fun OfferDialog(
     offer: OfferDto? = null,
     initialType: OfferType = OfferType.DATA,
     onDismiss: () -> Unit,
-    onConfirm: (String, String, Double, OfferType, String) -> Unit
+    onConfirm: (String, Double, OfferType, String) -> Unit
 ) {
     var name by remember { mutableStateOf(offer?.offer_name ?: "") }
-    var description by remember { mutableStateOf("") }
     var price by remember { mutableStateOf(offer?.amount?.toString() ?: "") }
     var ussd by remember { mutableStateOf(offer?.ussd ?: "") }
     var type by remember { mutableStateOf(offer?.category ?: initialType) }
+
+    val isFormValid = name.isNotBlank() && price.toDoubleOrNull() != null && ussd.isNotBlank()
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -263,7 +302,6 @@ private fun OfferDialog(
         title = { Text(if (offer == null) "Create Offer" else "Edit Offer", color = LoadrWhite) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                // Type Selector
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -294,6 +332,7 @@ private fun OfferDialog(
                     value = name,
                     onValueChange = { name = it },
                     label = { Text("Name") },
+                    modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = LoadrWhite,
                         unfocusedTextColor = LoadrWhite,
@@ -304,9 +343,10 @@ private fun OfferDialog(
                     )
                 )
                 OutlinedTextField(
-                    value = description,
-                    onValueChange = { description = it },
-                    label = { Text("Description") },
+                    value = ussd,
+                    onValueChange = { ussd = it },
+                    label = { Text("USSD Code") },
+                    modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = LoadrWhite,
                         unfocusedTextColor = LoadrWhite,
@@ -316,43 +356,32 @@ private fun OfferDialog(
                         unfocusedLabelColor = LoadrSlate
                     )
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = price,
-                        onValueChange = { price = it },
-                        label = { Text("Price") },
-                        modifier = Modifier.weight(1f),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = LoadrWhite,
-                            unfocusedTextColor = LoadrWhite,
-                            focusedBorderColor = LoadrGreen,
-                            unfocusedBorderColor = LoadrNavySurface,
-                            focusedLabelColor = LoadrGreen,
-                            unfocusedLabelColor = LoadrSlate
-                        )
+                OutlinedTextField(
+                    value = price,
+                    onValueChange = { price = it },
+                    label = { Text("Price (Ksh)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = LoadrWhite,
+                        unfocusedTextColor = LoadrWhite,
+                        focusedBorderColor = LoadrGreen,
+                        unfocusedBorderColor = LoadrNavySurface,
+                        focusedLabelColor = LoadrGreen,
+                        unfocusedLabelColor = LoadrSlate
                     )
-                    OutlinedTextField(
-                        value = ussd,
-                        onValueChange = { ussd = it },
-                        label = { Text("USSD") },
-                        modifier = Modifier.weight(1f),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = LoadrWhite,
-                            unfocusedTextColor = LoadrWhite,
-                            focusedBorderColor = LoadrGreen,
-                            unfocusedBorderColor = LoadrNavySurface,
-                            focusedLabelColor = LoadrGreen,
-                            unfocusedLabelColor = LoadrSlate
-                        )
-                    )
-                }
+                )
             }
         },
         confirmButton = {
             Button(
-                onClick = { onConfirm(name, description, price.toDoubleOrNull() ?: 0.0, type, ussd) },
-                colors = ButtonDefaults.buttonColors(containerColor = LoadrGreen)
+                onClick = { onConfirm(name, price.toDoubleOrNull() ?: 0.0, type, ussd) },
+                enabled = isFormValid,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = LoadrGreen,
+                    disabledContainerColor = LoadrGreen.copy(alpha = 0.3f),
+                    disabledContentColor = LoadrNavy.copy(alpha = 0.5f)
+                )
             ) {
                 Text(if (offer == null) "Create" else "Save", color = LoadrNavy)
             }

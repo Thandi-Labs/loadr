@@ -17,6 +17,7 @@ class HomeRepository(
 ) {
     private suspend fun bearerToken(): String {
         val token = tokenDataStore.accessToken.first()
+            ?: throw Exception("Not authenticated")
         return "Bearer $token"
     }
 

@@ -13,13 +13,21 @@ import kotlinx.coroutines.launch
 data class OffersUiState(
     val isLoading: Boolean = false,
     val offers: List<OfferDto> = emptyList(),
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val isActionInProgress: Boolean = false
 )
+
+sealed class OffersUiEvent {
+    data class ShowSnackbar(val message: String) : OffersUiEvent()
+}
 
 class OffersViewModel(private val repository: OffersRepository) : ViewModel() {
 
     private val _uiState = MutableStateFlow(OffersUiState())
     val uiState: StateFlow<OffersUiState> = _uiState.asStateFlow()
+
+    private val _eventFlow = MutableSharedFlow<OffersUiEvent>()
+    val eventFlow = _eventFlow.asSharedFlow()
 
     init {
         refresh()
@@ -39,9 +47,9 @@ class OffersViewModel(private val repository: OffersRepository) : ViewModel() {
         }
     }
 
-    fun createOffer(name: String, description: String, price: Double, type: OfferType, ussd: String) {
+    fun createOffer(name: String, price: Double, type: OfferType, ussd: String) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
+            _uiState.update { it.copy(isActionInProgress = true) }
             val newOffer = OfferDto(
                 id = 0,
                 offer_name = name,
@@ -51,34 +59,66 @@ class OffersViewModel(private val repository: OffersRepository) : ViewModel() {
                 active = true
             )
             when (val result = repository.createOffer(newOffer)) {
-                is OffersResult.Success -> refresh()
-                is OffersResult.Error -> _uiState.update { it.copy(isLoading = false, errorMessage = result.message) }
+                is OffersResult.Success -> {
+                    _eventFlow.emit(OffersUiEvent.ShowSnackbar("Offer created successfully"))
+                    refresh()
+                }
+                is OffersResult.Error -> {
+                    _eventFlow.emit(OffersUiEvent.ShowSnackbar(result.message))
+                }
             }
+            _uiState.update { it.copy(isActionInProgress = false) }
         }
     }
 
     fun updateOffer(updatedOffer: OfferDto) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
+            _uiState.update { it.copy(isActionInProgress = true) }
             when (val result = repository.updateOffer(updatedOffer)) {
-                is OffersResult.Success -> refresh()
-                is OffersResult.Error -> _uiState.update { it.copy(isLoading = false, errorMessage = result.message) }
+                is OffersResult.Success -> {
+                    _eventFlow.emit(OffersUiEvent.ShowSnackbar("Offer updated successfully"))
+                    refresh()
+                }
+                is OffersResult.Error -> {
+                    _eventFlow.emit(OffersUiEvent.ShowSnackbar(result.message))
+                }
             }
+            _uiState.update { it.copy(isActionInProgress = false) }
         }
     }
 
     fun deleteOffer(offerId: Int) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
+            _uiState.update { it.copy(isActionInProgress = true) }
             when (val result = repository.deleteOffer(offerId)) {
-                is OffersResult.Success -> refresh()
-                is OffersResult.Error -> _uiState.update { it.copy(isLoading = false, errorMessage = result.message) }
+                is OffersResult.Success -> {
+                    _eventFlow.emit(OffersUiEvent.ShowSnackbar("Offer deleted successfully"))
+                    refresh()
+                }
+                is OffersResult.Error -> {
+                    _eventFlow.emit(OffersUiEvent.ShowSnackbar(result.message))
+                }
             }
+            _uiState.update { it.copy(isActionInProgress = false) }
         }
     }
 
     fun toggleOfferStatus(offer: OfferDto) {
-        updateOffer(offer.copy(active = !offer.active))
+        viewModelScope.launch {
+            _uiState.update { it.copy(isActionInProgress = true) }
+            when (val result = repository.deactivateOffer(offer.id)) {
+                is OffersResult.Success -> {
+                    _eventFlow.emit(OffersUiEvent.ShowSnackbar(
+                        if (offer.active) "Offer deactivated" else "Offer activated"
+                    ))
+                    refresh()
+                }
+                is OffersResult.Error -> {
+                    _eventFlow.emit(OffersUiEvent.ShowSnackbar(result.message))
+                }
+            }
+            _uiState.update { it.copy(isActionInProgress = false) }
+        }
     }
 
     class Factory(private val repository: OffersRepository) : ViewModelProvider.Factory {

@@ -79,6 +79,7 @@ fun MainHomeView(
                     )
                 }
                 "Offers" -> {
+                    LaunchedEffect(Unit) { offersViewModel.refresh() }
                     OffersScreen(
                         viewModel = offersViewModel,
                         onBackClick = { currentScreen = "Home" }

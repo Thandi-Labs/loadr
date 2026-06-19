@@ -1,6 +1,7 @@
 package com.bytethrux.loadr.data.network
 
 
+import com.google.gson.annotations.SerializedName
 import retrofit2.http.*
 
 data class TokenResponse(
@@ -31,7 +32,9 @@ data class HomeStatsDto(
 )
 
 enum class OfferType {
-    DATA, MINUTES, SMS
+    @SerializedName("data") DATA,
+    @SerializedName("minutes") MINUTES,
+    @SerializedName("sms") SMS
 }
 
 data class OfferDto(
@@ -63,25 +66,31 @@ interface ApiService {
         @Header("Authorization") token: String
     ): HomeStatsDto
 
-    @GET("offers")
+    @GET("offers/")
     suspend fun getOffers(
         @Header("Authorization") token: String
     ): List<OfferDto>
 
-    @POST("offers")
+    @POST("offers/create")
     suspend fun createOffer(
         @Header("Authorization") token: String,
         @Body offer: OfferDto
-    ): OfferDto
+    )
 
-    @PUT("offers/{id}")
+    @PUT("offers/update/{id}")
     suspend fun updateOffer(
         @Header("Authorization") token: String,
         @Path("id") id: Int,
         @Body offer: OfferDto
-    ): OfferDto
+    )
 
-    @DELETE("offers/{id}")
+    @PUT("offers/deactivate/{id}")
+    suspend fun deactivateOffer(
+        @Header("Authorization") token: String,
+        @Path("id") id: Int
+    )
+
+    @DELETE("offers/delete/{id}")
     suspend fun deleteOffer(
         @Header("Authorization") token: String,
         @Path("id") id: Int

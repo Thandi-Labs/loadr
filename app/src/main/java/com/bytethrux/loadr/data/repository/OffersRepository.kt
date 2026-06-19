@@ -16,6 +16,7 @@ class OffersRepository(
 ) {
     private suspend fun bearerToken(): String {
         val token = tokenDataStore.accessToken.first()
+            ?: throw Exception("Not authenticated")
         return "Bearer $token"
     }
 
@@ -28,21 +29,30 @@ class OffersRepository(
         }
     }
 
-    suspend fun createOffer(offer: OfferDto): OffersResult<OfferDto> {
+    suspend fun createOffer(offer: OfferDto): OffersResult<Unit> {
         return try {
-            val created = api.createOffer(bearerToken(), offer)
-            OffersResult.Success(created)
+            api.createOffer(bearerToken(), offer)
+            OffersResult.Success(Unit)
         } catch (e: Exception) {
             OffersResult.Error(e.message ?: "Failed to create offer")
         }
     }
 
-    suspend fun updateOffer(offer: OfferDto): OffersResult<OfferDto> {
+    suspend fun updateOffer(offer: OfferDto): OffersResult<Unit> {
         return try {
-            val updated = api.updateOffer(bearerToken(), offer.id, offer)
-            OffersResult.Success(updated)
+            api.updateOffer(bearerToken(), offer.id, offer)
+            OffersResult.Success(Unit)
         } catch (e: Exception) {
             OffersResult.Error(e.message ?: "Failed to update offer")
+        }
+    }
+
+    suspend fun deactivateOffer(id: Int): OffersResult<Unit> {
+        return try {
+            api.deactivateOffer(bearerToken(), id)
+            OffersResult.Success(Unit)
+        } catch (e: Exception) {
+            OffersResult.Error(e.message ?: "Failed to toggle offer status")
         }
     }
 
