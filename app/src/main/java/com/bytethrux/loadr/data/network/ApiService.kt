@@ -47,6 +47,15 @@ data class OfferDto(
     val user_id: Int? = null
 )
 
+data class CreateTransactionRequest(
+    val offer_id: Int,
+    val customer_name: String,
+    val customer_phone: String,
+    val amount: Int,
+    val status: String,       // "success" | "failed"
+    val created_at: String,   // "YYYY-MM-DD"
+)
+
 interface ApiService {
 
     @FormUrlEncoded
@@ -56,7 +65,7 @@ interface ApiService {
         @Field("password") password: String
     ): TokenResponse
 
-    @GET("transactions")
+    @GET("transactions/")
     suspend fun getTransactions(
         @Header("Authorization") token: String
     ): List<TransactionDto>
@@ -90,10 +99,22 @@ interface ApiService {
         @Path("id") id: Int
     )
 
+    @PUT("offers/activate/{id}")
+    suspend fun activateOffer(
+        @Header("Authorization") token: String,
+        @Path("id") id: Int
+    )
+
     @DELETE("offers/delete/{id}")
     suspend fun deleteOffer(
         @Header("Authorization") token: String,
         @Path("id") id: Int
+    )
+
+    @POST("transactions/create-transaction")
+    suspend fun createTransaction(
+        @Header("Authorization") token: String,
+        @Body transaction: CreateTransactionRequest
     )
 }
 

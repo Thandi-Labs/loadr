@@ -14,11 +14,13 @@ class AuthRepository(
     private val tokenDataStore: TokenDataStore
 ) {
     val savedToken: Flow<String?> = tokenDataStore.accessToken
+    val savedUsername: Flow<String?> = tokenDataStore.username
 
     suspend fun login(username: String, password: String): AuthResult {
         return try {
             val response = api.login(username, password)
             tokenDataStore.saveToken(response.access_token)
+            tokenDataStore.saveUsername(username)
             AuthResult.Success
         } catch (e: retrofit2.HttpException) {
             val message = when (e.code()) {

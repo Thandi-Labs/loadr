@@ -1,9 +1,11 @@
 package com.bytethrux.loadr
 
+import android.Manifest
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -16,14 +18,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bytethrux.loadr.data.local.TokenDataStore
 import com.bytethrux.loadr.data.network.RetrofitClient
 import com.bytethrux.loadr.data.repository.AuthRepository
+import com.bytethrux.loadr.data.repository.HomeRepository
+import com.bytethrux.loadr.data.repository.OffersRepository
 import com.bytethrux.loadr.ui.auth.AuthViewModel
 import com.bytethrux.loadr.ui.home.HomeScreen
 import com.bytethrux.loadr.ui.home.HomeViewModel
 import com.bytethrux.loadr.ui.offers.OffersScreen
 import com.bytethrux.loadr.ui.offers.OffersViewModel
 import com.bytethrux.loadr.ui.theme.LoadrTheme
-import com.bytethrux.loadr.data.repository.HomeRepository
-import com.bytethrux.loadr.data.repository.OffersRepository
 import kotlin.getValue
 
 class MainActivity : ComponentActivity() {
@@ -42,9 +44,24 @@ class MainActivity : ComponentActivity() {
         OffersViewModel.Factory(offersRepository)
     }
 
+    private val permissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { /* permissions handled silently; service degrades gracefully if denied */ }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        RetrofitClient.initialize(tokenDataStore)
+
+        permissionLauncher.launch(
+            arrayOf(
+                Manifest.permission.RECEIVE_SMS,
+                Manifest.permission.READ_SMS,
+                Manifest.permission.CALL_PHONE,
+                Manifest.permission.READ_PHONE_STATE,
+            )
+        )
+
         setContent {
             LoadrTheme {
                 Surface {

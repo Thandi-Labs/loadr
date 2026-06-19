@@ -4,6 +4,21 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- SMS -->
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
+    <uses-permission android:name="android.permission.READ_SMS" />
+
+    <!-- USSD execution -->
+    <uses-permission android:name="android.permission.CALL_PHONE" />
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+
+    <!-- Foreground service (API 34+ requires type-specific permission) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SHORT_SERVICE" />
+
+    <!-- Keep service alive when device is idle -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
     <application
         android:allowBackup="true"
         android:usesCleartextTraffic="true"
@@ -14,6 +29,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Loadr">
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -21,10 +37,26 @@
             android:theme="@style/Theme.Loadr">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- SMS BroadcastReceiver — highest priority to intercept before other apps -->
+        <receiver
+            android:name=".service.MpesaSmsReceiver"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter android:priority="999">
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Background processing service -->
+        <service
+            android:name=".service.LoadrService"
+            android:foregroundServiceType="shortService"
+            android:exported="false" />
+
     </application>
 
 </manifest>
