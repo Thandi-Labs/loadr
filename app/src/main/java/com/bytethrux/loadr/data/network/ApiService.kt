@@ -1,11 +1,9 @@
 package com.bytethrux.loadr.data.network
 
 
-import retrofit2.http.Field
-import retrofit2.http.FormUrlEncoded
-import retrofit2.http.POST
-import  retrofit2.http.GET
-import retrofit2.http.Header
+import com.google.gson.annotations.SerializedName
+import retrofit2.http.*
+
 data class TokenResponse(
     val access_token: String,
     val token_type: String
@@ -13,11 +11,14 @@ data class TokenResponse(
 
 data class TransactionDto(
     val id: Int,
+    val user_id: Int? = null,
+    val offer_id: Int? = null,
     val customer_name: String,
-    val package_name: String,
-    val amount: Int,
-    val created_at: String,
-    val status: String       // "success" | "failed"
+    val customer_phone: String? = null,
+    val package_name: String? = null,
+    val amount: Double,
+    val status: String,       // "success" | "failed"
+    val created_at: String
 )
 
 data class HomeStatsDto(
@@ -27,7 +28,23 @@ data class HomeStatsDto(
     val airtime_used: Double,
     val airtime_balance: Double,
     val weekly_commission: Double,
-    val commission_by_day: List<Double>  // 7 values, Sun→Sat
+    val commission_by_day: List<Double>
+)
+
+enum class OfferType {
+    @SerializedName("data") DATA,
+    @SerializedName("minutes") MINUTES,
+    @SerializedName("sms") SMS
+}
+
+data class OfferDto(
+    val id: Int,
+    val offer_name: String,
+    val ussd: String,
+    val amount: Double,
+    val active: Boolean = true,
+    val category: OfferType,
+    val user_id: Int? = null
 )
 
 interface ApiService {
@@ -39,8 +56,8 @@ interface ApiService {
         @Field("password") password: String
     ): TokenResponse
 
-    @GET("transactions/today")
-    suspend fun getRecentTransactions(
+    @GET("transactions")
+    suspend fun getTransactions(
         @Header("Authorization") token: String
     ): List<TransactionDto>
 
@@ -48,6 +65,36 @@ interface ApiService {
     suspend fun getHomeStats(
         @Header("Authorization") token: String
     ): HomeStatsDto
+
+    @GET("offers/")
+    suspend fun getOffers(
+        @Header("Authorization") token: String
+    ): List<OfferDto>
+
+    @POST("offers/create")
+    suspend fun createOffer(
+        @Header("Authorization") token: String,
+        @Body offer: OfferDto
+    )
+
+    @PUT("offers/update/{id}")
+    suspend fun updateOffer(
+        @Header("Authorization") token: String,
+        @Path("id") id: Int,
+        @Body offer: OfferDto
+    )
+
+    @PUT("offers/deactivate/{id}")
+    suspend fun deactivateOffer(
+        @Header("Authorization") token: String,
+        @Path("id") id: Int
+    )
+
+    @DELETE("offers/delete/{id}")
+    suspend fun deleteOffer(
+        @Header("Authorization") token: String,
+        @Path("id") id: Int
+    )
 }
 
 

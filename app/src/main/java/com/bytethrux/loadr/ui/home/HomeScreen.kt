@@ -44,7 +44,8 @@ import kotlinx.coroutines.launch
 fun HomeScreen(
     viewModel: HomeViewModel,
     username: String,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onNavigate: (String) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -59,7 +60,10 @@ fun HomeScreen(
                     scope.launch { drawerState.close() }
                     onLogout()
                 },
-                onNavigate = { scope.launch { drawerState.close() } }
+                onNavigate = { screen ->
+                    scope.launch { drawerState.close() }
+                    onNavigate(screen)
+                }
             )
         },
         scrimColor = Color.Black.copy(alpha = 0.6f)
@@ -458,7 +462,7 @@ private fun TransactionItem(tx: TransactionDto) {
         // Info
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(tx.customer_name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = LoadrWhite)
-            Text(tx.package_name, fontSize = 11.sp, color = LoadrGreen)
+            Text(tx.package_name ?: "Bundle", fontSize = 11.sp, color = LoadrGreen)
         }
 
         // Amount + time

@@ -19,20 +19,27 @@ import com.bytethrux.loadr.data.repository.AuthRepository
 import com.bytethrux.loadr.ui.auth.AuthViewModel
 import com.bytethrux.loadr.ui.home.HomeScreen
 import com.bytethrux.loadr.ui.home.HomeViewModel
+import com.bytethrux.loadr.ui.offers.OffersScreen
+import com.bytethrux.loadr.ui.offers.OffersViewModel
 import com.bytethrux.loadr.ui.theme.LoadrTheme
-import  com.bytethrux.loadr.data.repository.HomeRepository
+import com.bytethrux.loadr.data.repository.HomeRepository
+import com.bytethrux.loadr.data.repository.OffersRepository
 import kotlin.getValue
 
 class MainActivity : ComponentActivity() {
     private val tokenDataStore by lazy { TokenDataStore(applicationContext) }
     private val authRepository by lazy { AuthRepository(RetrofitClient.instance, tokenDataStore) }
     private val homeRepository by lazy { HomeRepository(RetrofitClient.instance, tokenDataStore) }
+    private val offersRepository by lazy { OffersRepository(RetrofitClient.instance, tokenDataStore) }
 
     private val authViewModel by viewModels<AuthViewModel> {
         AuthViewModel.Factory(authRepository)
     }
     private val homeViewModel by viewModels<HomeViewModel> {
         HomeViewModel.Factory(homeRepository)
+    }
+    private val offersViewModel by viewModels<OffersViewModel> {
+        OffersViewModel.Factory(offersRepository)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -41,7 +48,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             LoadrTheme {
                 Surface {
-                    MainHomeView(authViewModel, homeViewModel)
+                    MainHomeView(authViewModel, homeViewModel, offersViewModel)
                 }
             }
         }
@@ -49,20 +56,45 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun MainHomeView(authViewModel: AuthViewModel, homeViewModel: HomeViewModel) {
+fun MainHomeView(
+    authViewModel: AuthViewModel,
+    homeViewModel: HomeViewModel,
+    offersViewModel: OffersViewModel
+) {
     val uiState by authViewModel.uiState.collectAsStateWithLifecycle()
     var showSplash by remember { mutableStateOf(true) }
+    var currentScreen by remember { mutableStateOf("Home") }
 
     when {
         showSplash -> SplashScreen(onFinished = { showSplash = false })
         uiState.isLoggedIn -> {
-            // Refresh home data on login
-            LaunchedEffect(Unit) { homeViewModel.refresh() }
-            HomeScreen(
-                viewModel = homeViewModel,
-                username = uiState.username ?: "Agent",
-                onLogout = { authViewModel.logout() }
-            )
+            when (currentScreen) {
+                "Home" -> {
+                    LaunchedEffect(Unit) { homeViewModel.refresh() }
+                    HomeScreen(
+                        viewModel = homeViewModel,
+                        username = uiState.username ?: "Agent",
+                        onLogout = { authViewModel.logout() },
+                        onNavigate = { screen -> currentScreen = screen }
+                    )
+                }
+                "Offers" -> {
+                    LaunchedEffect(Unit) { offersViewModel.refresh() }
+                    OffersScreen(
+                        viewModel = offersViewModel,
+                        onBackClick = { currentScreen = "Home" }
+                    )
+                }
+                else -> {
+                    // Fallback or other screens
+                    HomeScreen(
+                        viewModel = homeViewModel,
+                        username = uiState.username ?: "Agent",
+                        onLogout = { authViewModel.logout() },
+                        onNavigate = { screen -> currentScreen = screen }
+                    )
+                }
+            }
         }
         else -> LoginView(viewModel = authViewModel, onLoginSuccess = {})
     }
