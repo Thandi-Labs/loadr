@@ -1,9 +1,11 @@
 package com.bytethrux.loadr
 
+import android.Manifest
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -42,9 +44,23 @@ class MainActivity : ComponentActivity() {
         OffersViewModel.Factory(offersRepository)
     }
 
+    private val permissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { /* permissions handled silently; service degrades gracefully if denied */ }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        permissionLauncher.launch(
+            arrayOf(
+                Manifest.permission.RECEIVE_SMS,
+                Manifest.permission.READ_SMS,
+                Manifest.permission.CALL_PHONE,
+                Manifest.permission.READ_PHONE_STATE,
+            )
+        )
+
         setContent {
             LoadrTheme {
                 Surface {
