@@ -29,10 +29,6 @@ class OffersViewModel(private val repository: OffersRepository) : ViewModel() {
     private val _eventFlow = MutableSharedFlow<OffersUiEvent>()
     val eventFlow = _eventFlow.asSharedFlow()
 
-    init {
-        refresh()
-    }
-
     fun refresh() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
