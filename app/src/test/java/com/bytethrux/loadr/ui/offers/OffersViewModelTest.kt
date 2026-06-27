@@ -102,14 +102,23 @@ class OffersViewModelTest {
         coEvery { repository.getOffers() } returns OffersResult.Error("old error")
         viewModel.refresh()
         advanceUntilIdle()
+        assertEquals("old error", viewModel.uiState.value.errorMessage)
 
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        coEvery { repository.getOffers() } returns OffersResult.Success(listOf(dataOffer))
+        // Make the second call pause so we can observe the intermediate state.
+        // UnconfinedTestDispatcher runs the coroutine eagerly up to the first delay
+        // suspension, so the first state update (errorMessage = null) is visible
+        // before the repository call returns.
+        coEvery { repository.getOffers() } coAnswers {
+            kotlinx.coroutines.delay(500)
+            OffersResult.Success(listOf(dataOffer))
+        }
         viewModel.refresh()
 
-        // Error must be cleared as soon as loading starts, before the result arrives
         assertNull(viewModel.uiState.value.errorMessage)
+        assertTrue(viewModel.uiState.value.isLoading)
+
         advanceUntilIdle()
+        assertNull(viewModel.uiState.value.errorMessage)
     }
 
     // ------------------------------------------------------------------
@@ -279,10 +288,14 @@ class OffersViewModelTest {
 
     @Test
     fun `isActionInProgress is true during CRUD operations and false after`() = runTest {
-        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        coEvery { repository.createOffer(any()) } returns OffersResult.Success(Unit)
+        // Pause the repository call so the coroutine suspends mid-way.
+        // UnconfinedTestDispatcher runs the launch eagerly up to the first suspension,
+        // so isActionInProgress = true is visible before advanceUntilIdle().
+        coEvery { repository.createOffer(any()) } coAnswers {
+            kotlinx.coroutines.delay(500)
+            OffersResult.Success(Unit)
+        }
         coEvery { repository.getOffers() } returns OffersResult.Success(emptyList())
-        viewModel = OffersViewModel(repository)
 
         viewModel.eventFlow.test {
             viewModel.createOffer("Test", 10.0, OfferType.DATA, "*111#")

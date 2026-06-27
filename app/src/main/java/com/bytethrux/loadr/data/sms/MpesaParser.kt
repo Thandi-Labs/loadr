@@ -26,7 +26,7 @@ object MpesaParser {
             ?.replace(",", "") ?: return null
         val amount = amountStr.toDoubleOrNull() ?: return null
 
-        val senderMatch = senderRegex.find(message.uppercase()) ?: return null
+        val senderMatch = senderRegex.find(message) ?: return null
         val senderName = senderMatch.groupValues[1].trim()
         val rawPhone = senderMatch.groupValues[2]
 

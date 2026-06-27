@@ -22,6 +22,8 @@ class AuthRepositoryTest {
     fun setUp() {
         api = mockk()
         tokenDataStore = mockk()
+        every { tokenDataStore.accessToken } returns flowOf(null)
+        every { tokenDataStore.username } returns flowOf(null)
         repository = AuthRepository(api, tokenDataStore)
     }
 
@@ -114,10 +116,13 @@ class AuthRepositoryTest {
 
     @Test
     fun `savedToken emits value from tokenDataStore`() = runTest {
+        // AuthRepository captures the flow at construction time, so we must
+        // stub before creating the repository for this specific test.
         every { tokenDataStore.accessToken } returns flowOf("my_token")
+        val repo = AuthRepository(api, tokenDataStore)
 
         val collected = mutableListOf<String?>()
-        repository.savedToken.collect { collected.add(it) }
+        repo.savedToken.collect { collected.add(it) }
 
         assertEquals(listOf("my_token"), collected)
     }
@@ -125,9 +130,10 @@ class AuthRepositoryTest {
     @Test
     fun `savedUsername emits value from tokenDataStore`() = runTest {
         every { tokenDataStore.username } returns flowOf("julius")
+        val repo = AuthRepository(api, tokenDataStore)
 
         val collected = mutableListOf<String?>()
-        repository.savedUsername.collect { collected.add(it) }
+        repo.savedUsername.collect { collected.add(it) }
 
         assertEquals(listOf("julius"), collected)
     }
