@@ -31,10 +31,10 @@ class OffersViewModel(private val repository: OffersRepository) : ViewModel() {
 
     fun refresh() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
             when (val result = repository.getOffers()) {
                 is OffersResult.Success -> {
-                    _uiState.update { it.copy(isLoading = false, offers = result.data) }
+                    _uiState.update { it.copy(isLoading = false, offers = result.data, errorMessage = null) }
                 }
                 is OffersResult.Error -> {
                     _uiState.update { it.copy(isLoading = false, errorMessage = result.message) }
