@@ -1,6 +1,7 @@
 package com.bytethrux.loadr.data.network
 
 import com.bytethrux.loadr.data.local.TokenDataStore
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -31,9 +32,14 @@ object RetrofitClient {
             .writeTimeout(60, TimeUnit.SECONDS)
             .addInterceptor(loggingInterceptor)
             .addInterceptor { chain ->
-                val response = chain.proceed(chain.request())
+                val request = chain.request()
+                val response = chain.proceed(request)
                 if (response.code == 401 && ::tokenDataStore.isInitialized) {
-                    runBlocking { tokenDataStore.clearToken() }
+                    val requestToken = request.header("Authorization")?.removePrefix("Bearer ")
+                    val currentToken = runBlocking { tokenDataStore.accessToken.first() }
+                    if (requestToken != null && requestToken == currentToken) {
+                        runBlocking { tokenDataStore.clearToken() }
+                    }
                 }
                 response
             }
