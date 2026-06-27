@@ -9,6 +9,15 @@ jobs:
         runs-on: ubuntu-latest
 
         steps:
+            - name: Free disk space
+              run: |
+                  sudo rm -rf /usr/share/dotnet
+                  sudo rm -rf /usr/local/lib/android/sdk/ndk
+                  sudo rm -rf /usr/local/lib/android/sdk/build-tools/3[0-2]*
+                  sudo rm -rf /opt/ghc
+                  sudo rm -rf /opt/hostedtoolcache/CodeQL
+                  df -h
+
             - name: Checkout the code
               uses: actions/checkout@v4
 
@@ -22,8 +31,11 @@ jobs:
             - name: Grant execute permission for gradlew
               run: chmod +x gradlew
 
+            - name: Run unit tests
+              run: ./gradlew testDebugUnitTest --stacktrace
+
             - name: Build with Gradle
-              run: ./gradlew assembleDebug
+              run: ./gradlew assembleDebug --stacktrace
 
             - name: Upload APK Artifact
               uses: actions/upload-artifact@v4
