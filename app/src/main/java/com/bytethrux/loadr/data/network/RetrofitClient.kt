@@ -1,6 +1,7 @@
 package com.bytethrux.loadr.data.network
 
 import com.bytethrux.loadr.data.local.TokenDataStore
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
