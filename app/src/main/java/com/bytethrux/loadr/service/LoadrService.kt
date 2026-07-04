@@ -20,21 +20,34 @@ import com.bytethrux.loadr.data.local.SettingsDataStore
 import com.bytethrux.loadr.data.local.TokenDataStore
 import com.bytethrux.loadr.data.network.CreateTransactionRequest
 import com.bytethrux.loadr.data.network.RetrofitClient
+import com.bytethrux.loadr.data.offers.OfferMatcher
 import com.bytethrux.loadr.data.sim.SimManager
 import com.bytethrux.loadr.data.ussd.UssdExecutor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicInteger
 
 class LoadrService : Service() {
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    // Payments are accepted concurrently and queued; a single worker executes
+    // them in arrival order because the modem runs one USSD session at a time.
+    private data class PaymentJob(val amount: Double, val phone: String, val name: String)
+
+    private val paymentQueue = Channel<PaymentJob>(Channel.UNLIMITED)
+    private val pendingJobs = AtomicInteger(0)
+
+    @Volatile
+    private var lastStartId = -1
 
     companion object {
         const val ACTION_PROCESS_PAYMENT = "com.bytethrux.loadr.ACTION_PROCESS_PAYMENT"
@@ -43,7 +56,12 @@ class LoadrService : Service() {
         const val EXTRA_NAME = "extra_name"
 
         private const val CHANNEL_ID = "loadr_channel"
-        private const val NOTIFICATION_ID = 42
+        private const val FOREGROUND_NOTIFICATION_ID = 42
+        private const val FIRST_STATUS_NOTIFICATION_ID = 100
+
+        // Process-wide so payment status notifications stay unique even when
+        // the service is torn down and recreated between bursts of SMS.
+        private val nextStatusNotificationId = AtomicInteger(FIRST_STATUS_NOTIFICATION_ID)
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -52,24 +70,56 @@ class LoadrService : Service() {
         super.onCreate()
         RetrofitClient.initialize(TokenDataStore(applicationContext))
         createChannel()
-        startForeground(NOTIFICATION_ID, buildNotification("Loadr - Ready"))
+        startForeground(FOREGROUND_NOTIFICATION_ID, buildNotification("Loadr - Ready"))
+
+        scope.launch {
+            for (job in paymentQueue) {
+                try {
+                    processPayment(job.amount, job.phone, job.name)
+                } finally {
+                    val remaining = pendingJobs.decrementAndGet()
+                    if (remaining == 0) {
+                        // stopSelf(startId) is a no-op if a newer start
+                        // arrived in the meantime, so queued work is safe.
+                        stopSelf(lastStartId)
+                    } else {
+                        updateForegroundStatus()
+                    }
+                }
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        lastStartId = startId
         if (intent?.action == ACTION_PROCESS_PAYMENT) {
             val amount = intent.getDoubleExtra(EXTRA_AMOUNT, 0.0)
-            val phone = intent.getStringExtra(EXTRA_PHONE) ?: return START_NOT_STICKY
-            val name = intent.getStringExtra(EXTRA_NAME) ?: "Customer"
-
-            scope.launch {
-                processPayment(amount, phone, name)
+            val phone = intent.getStringExtra(EXTRA_PHONE)
+            if (phone != null) {
+                val name = intent.getStringExtra(EXTRA_NAME) ?: "Customer"
+                pendingJobs.incrementAndGet()
+                updateForegroundStatus()
+                paymentQueue.trySend(PaymentJob(amount, phone, name))
+            } else {
                 stopSelf(startId)
             }
         }
         return START_NOT_STICKY
     }
 
+    private fun updateForegroundStatus() {
+        val pending = pendingJobs.get()
+        val text = when {
+            pending <= 0 -> "Loadr - Ready"
+            pending == 1 -> "Loadr - Processing 1 payment…"
+            else -> "Loadr - Processing $pending payments…"
+        }
+        (getSystemService(NOTIFICATION_SERVICE) as NotificationManager)
+            .notify(FOREGROUND_NOTIFICATION_ID, buildNotification(text))
+    }
+
     private suspend fun processPayment(amount: Double, phone: String, customerName: String) {
+        val statusId = nextStatusNotificationId.getAndIncrement()
         val settings = SettingsDataStore(applicationContext).settings.first()
 
         if (settings.autoSaveContacts) {
@@ -80,7 +130,7 @@ class LoadrService : Service() {
 
         val token = TokenDataStore(applicationContext).accessToken.first()
         if (token == null) {
-            notify("Loadr - Not signed in, skipped payment from $phone")
+            notify(statusId, "Loadr - Not signed in, skipped payment from $phone")
             return
         }
         val bearer = "Bearer $token"
@@ -89,20 +139,18 @@ class LoadrService : Service() {
         val offers = try {
             api.getOffers(bearer)
         } catch (e: Exception) {
-            notify("Loadr - Could not load offers (${e.message})")
+            notify(statusId, "Loadr - Could not load offers (${e.message})")
             return
         }
 
-        // Match by amount; ignore cents rounding with a 0.01 tolerance
-        val offer = offers.firstOrNull { it.active && kotlin.math.abs(it.amount - amount) < 0.01 }
+        val offer = OfferMatcher.match(offers, amount)
         if (offer == null) {
-            notify("Loadr - No active offer found for Ksh${amount.toLong()} from $phone")
+            notify(statusId, "Loadr - No active offer found for Ksh${amount.toLong()} from $phone")
             return
         }
 
-        // Replace "LD" placeholder with the customer's phone number
-        val ussdCode = offer.ussd.replace("LD", phone)
-        notify("Loadr - Sending ${offer.offer_name} to $phone…")
+        val ussdCode = OfferMatcher.buildUssd(offer, phone)
+        notify(statusId, "Loadr - Sending ${offer.offer_name} to $phone…")
 
         val result = UssdExecutor(applicationContext).run(
             code = ussdCode,
@@ -137,6 +185,7 @@ class LoadrService : Service() {
         }
 
         notify(
+            statusId,
             if (result.success) "Loadr - Sent ${offer.offer_name} to $phone"
             else "Loadr - USSD failed for ${offer.offer_name} → $phone"
         )
@@ -170,9 +219,9 @@ class LoadrService : Service() {
     private fun todayDate(): String =
         SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
 
-    private fun notify(message: String) {
+    private fun notify(id: Int, message: String) {
         (getSystemService(NOTIFICATION_SERVICE) as NotificationManager)
-            .notify(NOTIFICATION_ID, buildNotification(message))
+            .notify(id, buildNotification(message))
     }
 
     private fun buildNotification(message: String): Notification {

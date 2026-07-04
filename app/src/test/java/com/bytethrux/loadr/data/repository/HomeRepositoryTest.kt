@@ -43,7 +43,9 @@ class HomeRepositoryTest {
         assertEquals(0, data.failed_today)
         assertEquals(518, data.token_balance)
         assertEquals(65.0, data.airtime_used, 0.001)
-        assertEquals(284.29, data.airtime_balance, 0.001)
+        // Placeholder only: the dashboard replaces this with the real SIM
+        // balance fetched via the *144# USSD.
+        assertEquals(0.0, data.airtime_balance, 0.001)
         assertEquals(24.0, data.weekly_commission, 0.001)
         assertEquals(7, data.commission_by_day.size)
     }

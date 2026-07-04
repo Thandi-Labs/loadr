@@ -4,6 +4,7 @@ import com.bytethrux.loadr.data.network.HomeStatsDto
 import com.bytethrux.loadr.data.network.TransactionDto
 import com.bytethrux.loadr.data.repository.HomeRepository
 import com.bytethrux.loadr.data.repository.HomeResult
+import com.bytethrux.loadr.data.ussd.AirtimeBalanceProvider
 import io.mockk.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -104,6 +105,47 @@ class HomeViewModelTest {
 
         advanceUntilIdle()
         assertFalse(viewModel.uiState.value.isLoading)
+    }
+
+    // ------------------------------------------------------------------
+    // Airtime balance (from the SIM via *144#)
+    // ------------------------------------------------------------------
+
+    @Test
+    fun `airtime balance is replaced by the SIM balance from the provider`() = runTest {
+        val provider = mockk<AirtimeBalanceProvider>()
+        coEvery { provider.cachedBalance() } returns 120.50
+        coEvery { provider.refreshBalance() } returns 130.75
+
+        viewModel = HomeViewModel(repository, provider)
+        advanceUntilIdle()
+
+        // The backend/mock figure is discarded in favour of the USSD reading.
+        assertEquals(130.75, viewModel.uiState.value.stats!!.airtime_balance, 0.001)
+    }
+
+    @Test
+    fun `cached SIM balance is shown when the USSD refresh fails`() = runTest {
+        val provider = mockk<AirtimeBalanceProvider>()
+        coEvery { provider.cachedBalance() } returns 88.25
+        coEvery { provider.refreshBalance() } returns null
+
+        viewModel = HomeViewModel(repository, provider)
+        advanceUntilIdle()
+
+        assertEquals(88.25, viewModel.uiState.value.stats!!.airtime_balance, 0.001)
+    }
+
+    @Test
+    fun `airtime balance defaults to zero when no reading exists`() = runTest {
+        val provider = mockk<AirtimeBalanceProvider>()
+        coEvery { provider.cachedBalance() } returns null
+        coEvery { provider.refreshBalance() } returns null
+
+        viewModel = HomeViewModel(repository, provider)
+        advanceUntilIdle()
+
+        assertEquals(0.0, viewModel.uiState.value.stats!!.airtime_balance, 0.001)
     }
 
     @Test

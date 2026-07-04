@@ -35,9 +35,11 @@ class HomeViewModel(
             val txResult = repository.getRecentTransactions()
             var stats = (statsResult as? HomeResult.Success)?.data
 
-            // Show the last known SIM balance immediately…
-            airtimeBalanceProvider?.cachedBalance()?.let { cached ->
-                stats = stats?.copy(airtime_balance = cached)
+            // The airtime balance always comes from the SIM (*144#), never
+            // from the backend stats. Show the last known value immediately…
+            if (airtimeBalanceProvider != null) {
+                val cached = airtimeBalanceProvider.cachedBalance()
+                stats = stats?.copy(airtime_balance = cached ?: 0.0)
             }
             _uiState.update {
                 it.copy(
@@ -48,7 +50,7 @@ class HomeViewModel(
                 )
             }
 
-            // …then query the real balance from the SIM via the *144# USSD.
+            // …then run the *144# USSD for a fresh reading.
             if (airtimeBalanceProvider != null && stats != null) {
                 val balance = airtimeBalanceProvider.refreshBalance()
                 if (balance != null) {
