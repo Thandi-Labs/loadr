@@ -38,6 +38,10 @@ fun LoginView(onLoginSuccess: () -> Unit, viewModel: AuthViewModel) {
         if (uiState.isLoggedIn) onLoginSuccess()
     }
 
+    // Capture theme colours for use inside Canvas draw scopes.
+    val greenColor = LoadrGreen
+    val navyColor = LoadrNavy
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -58,7 +62,7 @@ fun LoginView(onLoginSuccess: () -> Unit, viewModel: AuthViewModel) {
                     var y = spacing / 2
                     while (y < size.height) {
                         drawCircle(
-                            color = LoadrGreen.copy(alpha = 0.07f),
+                            color = greenColor.copy(alpha = 0.07f),
                             radius = dotRadius,
                             center = Offset(x, y)
                         )
@@ -81,9 +85,9 @@ fun LoginView(onLoginSuccess: () -> Unit, viewModel: AuthViewModel) {
                 ) {
                     Canvas(modifier = Modifier.size(20.dp)) {
                         val cx = size.width / 2
-                        drawLine(LoadrNavy, Offset(2.dp.toPx(), size.height), Offset(cx, 3.dp.toPx()), 2.5.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
-                        drawLine(LoadrNavy, Offset(cx, 3.dp.toPx()), Offset(size.width - 2.dp.toPx(), size.height), 2.5.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
-                        drawLine(LoadrNavy, Offset(6.dp.toPx(), 14.dp.toPx()), Offset(size.width - 6.dp.toPx(), 14.dp.toPx()), 2.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                        drawLine(navyColor, Offset(2.dp.toPx(), size.height), Offset(cx, 3.dp.toPx()), 2.5.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                        drawLine(navyColor, Offset(cx, 3.dp.toPx()), Offset(size.width - 2.dp.toPx(), size.height), 2.5.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                        drawLine(navyColor, Offset(6.dp.toPx(), 14.dp.toPx()), Offset(size.width - 6.dp.toPx(), 14.dp.toPx()), 2.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
                     }
                 }
                 Text(
@@ -119,7 +123,7 @@ fun LoginView(onLoginSuccess: () -> Unit, viewModel: AuthViewModel) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(10.dp))
-                        .background(Color(0xFF2A1018))
+                        .background(LocalLoadrColors.current.errorBg)
                         .padding(12.dp)
                 ) {
                     Text(error, color = LoadrRed, fontSize = 13.sp)

@@ -1,37 +1,36 @@
 package com.bytethrux.loadr.service
 
-import android.annotation.SuppressLint
+import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
-import android.net.Uri
+import android.content.pm.PackageManager
 import android.os.Build
-import android.os.Handler
 import android.os.IBinder
-import android.os.Looper
-import android.telephony.TelephonyManager
-import androidx.annotation.RequiresApi
+import android.telephony.SmsManager
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import com.bytethrux.loadr.MainActivity
 import com.bytethrux.loadr.R
+import com.bytethrux.loadr.data.local.ProcessingMode
+import com.bytethrux.loadr.data.local.SettingsDataStore
 import com.bytethrux.loadr.data.local.TokenDataStore
 import com.bytethrux.loadr.data.network.CreateTransactionRequest
 import com.bytethrux.loadr.data.network.RetrofitClient
+import com.bytethrux.loadr.data.sim.SimManager
+import com.bytethrux.loadr.data.ussd.UssdExecutor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.withTimeoutOrNull
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import kotlin.coroutines.resume
 
 class LoadrService : Service() {
 
@@ -71,6 +70,14 @@ class LoadrService : Service() {
     }
 
     private suspend fun processPayment(amount: Double, phone: String, customerName: String) {
+        val settings = SettingsDataStore(applicationContext).settings.first()
+
+        if (settings.autoSaveContacts) {
+            ContactSaver.saveIfNew(
+                applicationContext, customerName, phone, settings.contactNameSuffix
+            )
+        }
+
         val token = TokenDataStore(applicationContext).accessToken.first()
         if (token == null) {
             notify("Loadr - Not signed in, skipped payment from $phone")
@@ -97,8 +104,12 @@ class LoadrService : Service() {
         val ussdCode = offer.ussd.replace("LD", phone)
         notify("Loadr - Sending ${offer.offer_name} to $phone…")
 
-        val success = runUssd(ussdCode)
-        val status = if (success) "success" else "failed"
+        val result = UssdExecutor(applicationContext).run(
+            code = ussdCode,
+            simSlot = settings.bingwaSimSlot,
+            multiStep = settings.processingMode == ProcessingMode.ADVANCED,
+        )
+        val status = if (result.success) "success" else "failed"
 
         try {
             api.createTransaction(
@@ -116,56 +127,43 @@ class LoadrService : Service() {
             // Log failure silently; USSD may have already executed
         }
 
+        if (result.success && settings.engageBot) {
+            sendAutoReply(
+                phone = phone,
+                name = customerName,
+                offerName = offer.offer_name,
+                simSlot = settings.autoReplySimSlot,
+            )
+        }
+
         notify(
-            if (success) "Loadr - Sent ${offer.offer_name} to $phone"
+            if (result.success) "Loadr - Sent ${offer.offer_name} to $phone"
             else "Loadr - USSD failed for ${offer.offer_name} → $phone"
         )
     }
 
-    private suspend fun runUssd(code: String): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            ussdApi26(code)
-        } else {
-            ussdViaDialIntent(code)
-        }
-    }
+    private fun sendAutoReply(phone: String, name: String, offerName: String, simSlot: Int) {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.SEND_SMS)
+            != PackageManager.PERMISSION_GRANTED
+        ) return
 
-    @SuppressLint("MissingPermission")
-    @RequiresApi(Build.VERSION_CODES.O)
-    private suspend fun ussdApi26(code: String): Boolean {
-        val tm = getSystemService(TELEPHONY_SERVICE) as TelephonyManager
-        return try {
-            withTimeoutOrNull(30_000L) {
-                suspendCancellableCoroutine { cont ->
-                    tm.sendUssdRequest(
-                        code,
-                        object : TelephonyManager.UssdResponseCallback() {
-                            override fun onReceiveUssdResponse(
-                                tm: TelephonyManager, request: String, response: CharSequence
-                            ) = cont.resume(true)
-
-                            override fun onReceiveUssdResponseFailed(
-                                tm: TelephonyManager, request: String, failureCode: Int
-                            ) = cont.resume(false)
-                        },
-                        Handler(Looper.getMainLooper())
-                    )
+        val message =
+            "Hi ${name.split(" ").first().lowercase().replaceFirstChar { it.uppercase() }}, " +
+                "your $offerName has been processed. Thank you for your purchase!"
+        try {
+            val subId = SimManager.subscriptionIdForSlot(applicationContext, simSlot)
+            val smsManager = when {
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+                    val base = getSystemService(SmsManager::class.java)
+                    if (subId != null) base.createForSubscriptionId(subId) else base
                 }
-            } ?: false
-        } catch (_: SecurityException) {
-            false
-        }
-    }
-
-    private fun ussdViaDialIntent(code: String): Boolean {
-        return try {
-            val uri = Uri.parse("tel:${code.replace("#", Uri.encode("#"))}")
-            startActivity(
-                Intent(Intent.ACTION_CALL, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            )
-            true
+                subId != null -> @Suppress("DEPRECATION")
+                    SmsManager.getSmsManagerForSubscriptionId(subId)
+                else -> @Suppress("DEPRECATION") SmsManager.getDefault()
+            }
+            smsManager.sendTextMessage(phone, null, message, null, null)
         } catch (_: Exception) {
-            false
+            // Auto-replies are best-effort.
         }
     }
 

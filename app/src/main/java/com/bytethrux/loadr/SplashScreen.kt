@@ -36,6 +36,10 @@ fun SplashScreen(onFinished: () -> Unit) {
         ), label = "dotAlpha"
     )
 
+    // Capture theme colours for use inside Canvas draw scopes.
+    val greenColor = LoadrGreen
+    val navyColor = LoadrNavy
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -51,7 +55,7 @@ fun SplashScreen(onFinished: () -> Unit) {
                 var y = spacing / 2
                 while (y < size.height) {
                     drawCircle(
-                        color = LoadrGreen.copy(alpha = dotAlpha),
+                        color = greenColor.copy(alpha = dotAlpha),
                         radius = dotRadius,
                         center = Offset(x, y)
                     )
@@ -73,21 +77,21 @@ fun SplashScreen(onFinished: () -> Unit) {
                 Canvas(modifier = Modifier.size(40.dp)) {
                     val cx = size.width / 2
                     drawLine(
-                        color = LoadrNavy,
+                        color = navyColor,
                         start = Offset(4.dp.toPx(), size.height),
                         end = Offset(cx, 6.dp.toPx()),
                         strokeWidth = 3.5.dp.toPx(),
                         cap = androidx.compose.ui.graphics.StrokeCap.Round
                     )
                     drawLine(
-                        color = LoadrNavy,
+                        color = navyColor,
                         start = Offset(cx, 6.dp.toPx()),
                         end = Offset(size.width - 4.dp.toPx(), size.height),
                         strokeWidth = 3.5.dp.toPx(),
                         cap = androidx.compose.ui.graphics.StrokeCap.Round
                     )
                     drawLine(
-                        color = LoadrNavy,
+                        color = navyColor,
                         start = Offset(12.dp.toPx(), 26.dp.toPx()),
                         end = Offset(size.width - 12.dp.toPx(), 26.dp.toPx()),
                         strokeWidth = 2.5.dp.toPx(),
