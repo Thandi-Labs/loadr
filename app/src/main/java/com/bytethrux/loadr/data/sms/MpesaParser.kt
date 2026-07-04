@@ -1,10 +1,14 @@
 package com.bytethrux.loadr.data.sms
 
+/** Which payment channel an incoming SMS belongs to. */
+enum class PaymentType { PERSONAL, TILL, PAYBILL, SITELINK }
+
 data class MpesaPayment(
     val transactionCode: String,
     val amount: Double,
     val senderName: String,
     val senderPhone: String,
+    val type: PaymentType = PaymentType.PERSONAL,
 )
 
 object MpesaParser {
@@ -35,7 +39,16 @@ object MpesaParser {
             amount = amount,
             senderName = senderName,
             senderPhone = normalizePhone(rawPhone),
+            type = classify(message),
         )
+    }
+
+    private fun classify(message: String): PaymentType = when {
+        message.contains("till", ignoreCase = true) -> PaymentType.TILL
+        message.contains("paybill", ignoreCase = true) ||
+            message.contains("for account", ignoreCase = true) -> PaymentType.PAYBILL
+        message.contains("sitelink", ignoreCase = true) -> PaymentType.SITELINK
+        else -> PaymentType.PERSONAL
     }
 
     // Normalise to local 07/01 format so USSD replacement is consistent

@@ -1,6 +1,7 @@
 package com.bytethrux.loadr
 
 import android.Manifest
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -15,33 +16,45 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.bytethrux.loadr.data.local.SettingsDataStore
 import com.bytethrux.loadr.data.local.TokenDataStore
 import com.bytethrux.loadr.data.network.RetrofitClient
 import com.bytethrux.loadr.data.repository.AuthRepository
 import com.bytethrux.loadr.data.repository.HomeRepository
 import com.bytethrux.loadr.data.repository.OffersRepository
+import com.bytethrux.loadr.data.sim.SimManager
+import com.bytethrux.loadr.data.ussd.AirtimeBalanceProvider
 import com.bytethrux.loadr.ui.auth.AuthViewModel
+import com.bytethrux.loadr.ui.common.ComingSoonScreen
 import com.bytethrux.loadr.ui.home.HomeScreen
 import com.bytethrux.loadr.ui.home.HomeViewModel
 import com.bytethrux.loadr.ui.offers.OffersScreen
 import com.bytethrux.loadr.ui.offers.OffersViewModel
+import com.bytethrux.loadr.ui.settings.SettingsScreen
+import com.bytethrux.loadr.ui.settings.SettingsViewModel
 import com.bytethrux.loadr.ui.theme.LoadrTheme
+import com.bytethrux.loadr.ui.theme.ThemeMode
 import kotlin.getValue
 
 class MainActivity : ComponentActivity() {
     private val tokenDataStore by lazy { TokenDataStore(applicationContext) }
+    private val settingsDataStore by lazy { SettingsDataStore(applicationContext) }
     private val authRepository by lazy { AuthRepository(RetrofitClient.instance, tokenDataStore) }
     private val homeRepository by lazy { HomeRepository(RetrofitClient.instance, tokenDataStore) }
     private val offersRepository by lazy { OffersRepository(RetrofitClient.instance, tokenDataStore) }
+    private val airtimeBalanceProvider by lazy { AirtimeBalanceProvider(applicationContext) }
 
     private val authViewModel by viewModels<AuthViewModel> {
         AuthViewModel.Factory(authRepository)
     }
     private val homeViewModel by viewModels<HomeViewModel> {
-        HomeViewModel.Factory(homeRepository)
+        HomeViewModel.Factory(homeRepository, airtimeBalanceProvider)
     }
     private val offersViewModel by viewModels<OffersViewModel> {
         OffersViewModel.Factory(offersRepository)
+    }
+    private val settingsViewModel by viewModels<SettingsViewModel> {
+        SettingsViewModel.Factory(settingsDataStore, SimManager.activeSims(applicationContext))
     }
 
     private val permissionLauncher = registerForActivityResult(
@@ -53,19 +66,25 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         RetrofitClient.initialize(tokenDataStore)
 
-        permissionLauncher.launch(
-            arrayOf(
-                Manifest.permission.RECEIVE_SMS,
-                Manifest.permission.READ_SMS,
-                Manifest.permission.CALL_PHONE,
-                Manifest.permission.READ_PHONE_STATE,
-            )
+        val permissions = mutableListOf(
+            Manifest.permission.RECEIVE_SMS,
+            Manifest.permission.READ_SMS,
+            Manifest.permission.SEND_SMS,
+            Manifest.permission.CALL_PHONE,
+            Manifest.permission.READ_PHONE_STATE,
+            Manifest.permission.READ_CONTACTS,
+            Manifest.permission.WRITE_CONTACTS,
         )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissions += Manifest.permission.POST_NOTIFICATIONS
+        }
+        permissionLauncher.launch(permissions.toTypedArray())
 
         setContent {
-            LoadrTheme {
+            val settings by settingsViewModel.settings.collectAsStateWithLifecycle()
+            LoadrTheme(themeMode = ThemeMode.fromString(settings.themeMode)) {
                 Surface {
-                    MainHomeView(authViewModel, homeViewModel, offersViewModel)
+                    MainHomeView(authViewModel, homeViewModel, offersViewModel, settingsViewModel)
                 }
             }
         }
@@ -76,7 +95,8 @@ class MainActivity : ComponentActivity() {
 fun MainHomeView(
     authViewModel: AuthViewModel,
     homeViewModel: HomeViewModel,
-    offersViewModel: OffersViewModel
+    offersViewModel: OffersViewModel,
+    settingsViewModel: SettingsViewModel
 ) {
     val uiState by authViewModel.uiState.collectAsStateWithLifecycle()
     var showSplash by remember { mutableStateOf(true) }
@@ -102,13 +122,18 @@ fun MainHomeView(
                         onBackClick = { currentScreen = "Home" }
                     )
                 }
-                else -> {
-                    // Fallback or other screens
-                    HomeScreen(
-                        viewModel = homeViewModel,
+                "Settings" -> {
+                    SettingsScreen(
+                        viewModel = settingsViewModel,
                         username = uiState.username ?: "Agent",
-                        onLogout = { authViewModel.logout() },
-                        onNavigate = { screen -> currentScreen = screen }
+                        onBackClick = { currentScreen = "Home" }
+                    )
+                }
+                else -> {
+                    // Features on the roadmap but not built yet
+                    ComingSoonScreen(
+                        title = currentScreen,
+                        onBackClick = { currentScreen = "Home" }
                     )
                 }
             }
@@ -116,4 +141,3 @@ fun MainHomeView(
         else -> LoginView(viewModel = authViewModel, onLoginSuccess = {})
     }
 }
-

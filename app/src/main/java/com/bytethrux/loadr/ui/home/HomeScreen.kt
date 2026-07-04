@@ -162,7 +162,7 @@ private fun HomeTopBar(username: String, onMenuClick: () -> Unit) {
                     .background(LoadrGreen),
                 contentAlignment = Alignment.Center
             ) {
-                Text(initials, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = LoadrNavy)
+                Text(initials, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = LoadrOnGreen)
             }
         },
         navigationIcon = {
@@ -181,6 +181,7 @@ private fun HomeTopBar(username: String, onMenuClick: () -> Unit) {
 
 @Composable
 private fun StatCardsRow(stats: HomeStatsDto) {
+    val colors = LocalLoadrColors.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -192,7 +193,7 @@ private fun StatCardsRow(stats: HomeStatsDto) {
             label = "Successful",
             valueColor = LoadrGreen,
             borderColor = LoadrGreen,
-            bgColor = Color(0xFF0D2818),
+            bgColor = colors.successBg,
             modifier = Modifier.weight(1f)
         )
         StatCard(
@@ -200,15 +201,15 @@ private fun StatCardsRow(stats: HomeStatsDto) {
             label = "Failed",
             valueColor = LoadrRed,
             borderColor = LoadrRed,
-            bgColor = Color(0xFF2A1018),
+            bgColor = colors.errorBg,
             modifier = Modifier.weight(1f)
         )
         StatCard(
             value = stats.token_balance.toString(),
             label = "Tokens",
-            valueColor = Color(0xFF4A9EF5),
-            borderColor = Color(0xFF1A6FBF),
-            bgColor = Color(0xFF0A1F35),
+            valueColor = colors.infoText,
+            borderColor = colors.infoBorder,
+            bgColor = colors.infoBg,
             modifier = Modifier.weight(1f)
         )
     }
@@ -283,6 +284,7 @@ private fun CommissionChart(stats: HomeStatsDto) {
         animProgress.animateTo(1f, animationSpec = tween(1000, easing = EaseInOutCubic))
     }
     val progress by animProgress.asState()
+    val chartColors = LocalLoadrColors.current
 
     Column(
         modifier = Modifier
@@ -318,7 +320,7 @@ private fun CommissionChart(stats: HomeStatsDto) {
                 .fillMaxWidth()
                 .height(100.dp)
         ) {
-            drawCommissionChart(values, maxVal, days, progress)
+            drawCommissionChart(values, maxVal, days, progress, chartColors)
         }
     }
 }
@@ -327,7 +329,8 @@ private fun DrawScope.drawCommissionChart(
     values: List<Double>,
     maxVal: Double,
     days: List<String>,
-    progress: Float
+    progress: Float,
+    colors: LoadrColorScheme
 ) {
     if (values.size < 2) return
     val w = size.width
@@ -368,7 +371,7 @@ private fun DrawScope.drawCommissionChart(
     drawPath(
         path,
         brush = Brush.verticalGradient(
-            colors = listOf(Color(0xFF00C853).copy(alpha = 0.3f), Color.Transparent),
+            colors = listOf(colors.green.copy(alpha = 0.3f), Color.Transparent),
             startY = 0f, endY = h
         )
     )
@@ -382,7 +385,7 @@ private fun DrawScope.drawCommissionChart(
         val cx = (p1.x + p2.x) / 2
         linePath.cubicTo(cx, p1.y, cx, p2.y, p2.x, p2.y)
     }
-    drawPath(linePath, Color(0xFF00C853), style = androidx.compose.ui.graphics.drawscope.Stroke(
+    drawPath(linePath, colors.green, style = androidx.compose.ui.graphics.drawscope.Stroke(
         width = 2.dp.toPx(),
         cap = StrokeCap.Round,
         join = StrokeJoin.Round
@@ -391,21 +394,21 @@ private fun DrawScope.drawCommissionChart(
     // Draw dots and day labels
     val labelPaint = android.graphics.Paint().apply {
         textSize = 10.sp.toPx()
-        color = android.graphics.Color.parseColor("#4A7C9E")
+        color = colors.slate.toArgb()
         textAlign = android.graphics.Paint.Align.CENTER
     }
     values.forEachIndexed { i, _ ->
         val p = points[i]
-        drawCircle(Color(0xFF4A7C9E), radius = 3.dp.toPx(), center = p)
-        drawCircle(Color(0xFF0A1628), radius = 1.5.dp.toPx(), center = p)
+        drawCircle(colors.slate, radius = 3.dp.toPx(), center = p)
+        drawCircle(colors.chartDot, radius = 1.5.dp.toPx(), center = p)
         drawContext.canvas.nativeCanvas.drawText(
             days[i], p.x, size.height, labelPaint
         )
     }
     // Highlight last point
     if (progress >= 1f) {
-        drawCircle(Color(0xFFFF4757), radius = 4.dp.toPx(), center = points.last())
-        drawCircle(Color(0xFF0A1628), radius = 2.dp.toPx(), center = points.last())
+        drawCircle(colors.red, radius = 4.dp.toPx(), center = points.last())
+        drawCircle(colors.chartDot, radius = 2.dp.toPx(), center = points.last())
     }
 }
 
@@ -441,11 +444,12 @@ private fun TransactionItem(tx: TransactionDto) {
     ) {
         // Status icon
         val isSuccess = tx.status == "success"
+        val colors = LocalLoadrColors.current
         Box(
             modifier = Modifier
                 .size(32.dp)
                 .clip(CircleShape)
-                .background(if (isSuccess) Color(0xFF0D2818) else Color(0xFF2A1018))
+                .background(if (isSuccess) colors.successBg else colors.errorBg)
                 .border(1.dp, if (isSuccess) LoadrGreen else LoadrRed, CircleShape),
             contentAlignment = Alignment.Center
         ) {
@@ -495,9 +499,10 @@ private fun LoadrDrawer(
     )
 
     var activeItem by remember { mutableStateOf("Home") }
+    val colors = LocalLoadrColors.current
 
     ModalDrawerSheet(
-        drawerContainerColor = Color(0xFF0D1E30),
+        drawerContainerColor = colors.drawerBg,
         drawerContentColor = LoadrWhite,
         modifier = Modifier.width(280.dp)
     ) {
@@ -510,7 +515,7 @@ private fun LoadrDrawer(
                     modifier = Modifier.size(40.dp).clip(RoundedCornerShape(11.dp)).background(LoadrGreen),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(username.take(2).uppercase(), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = LoadrNavy)
+                    Text(username.take(2).uppercase(), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = LoadrOnGreen)
                 }
                 Column {
                     Text(username.replaceFirstChar { it.uppercase() }, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = LoadrWhite)
@@ -534,10 +539,10 @@ private fun LoadrDrawer(
                 },
                 icon = { Icon(icon, contentDescription = label, modifier = Modifier.size(20.dp)) },
                 colors = NavigationDrawerItemDefaults.colors(
-                    selectedContainerColor = Color(0xFF0D2818),
+                    selectedContainerColor = colors.greenDim,
                     unselectedContainerColor = Color.Transparent,
                     selectedTextColor = LoadrGreen,
-                    unselectedTextColor = Color(0xFFB8D0E8),
+                    unselectedTextColor = colors.navText,
                     selectedIconColor = LoadrGreen,
                     unselectedIconColor = LoadrSlate
                 ),
