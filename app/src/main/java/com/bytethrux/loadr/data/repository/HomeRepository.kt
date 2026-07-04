@@ -40,7 +40,8 @@ class HomeRepository(
         failed_today = 0,
         token_balance = 518,
         airtime_used = 65.0,
-        airtime_balance = 284.29,
+        // Replaced at runtime with the real SIM balance read via *144#
+        airtime_balance = 0.0,
         weekly_commission = 24.0,
         commission_by_day = listOf(2.0, 6.0, 6.0, 0.0, 0.0, 2.0, 8.0)
     )

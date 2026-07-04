@@ -12,6 +12,8 @@ import androidx.annotation.RequiresApi
 import com.bytethrux.loadr.data.sim.SimManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
 
@@ -34,6 +36,11 @@ class UssdExecutor(private val context: Context) {
         const val BALANCE_CODE = "*144#"
         private const val USSD_TIMEOUT_MS = 35_000L
         private const val STEP_DELAY_MS = 2_000L
+
+        // The modem handles one USSD session at a time. All executors share
+        // this lock so concurrent payment/balance requests queue up instead
+        // of colliding mid-session.
+        private val ussdLock = Mutex()
 
         private val STEP_SEPARATOR = Regex("""[;\n]+""")
 
@@ -62,14 +69,20 @@ class UssdExecutor(private val context: Context) {
         }
         if (steps.isEmpty()) return UssdResult(success = false)
 
-        var lastResponse: String? = null
-        steps.forEachIndexed { index, step ->
-            if (index > 0) delay(STEP_DELAY_MS)
-            val result = runSingle(step, simSlot)
-            if (!result.success) return UssdResult(success = false, response = result.response)
-            lastResponse = result.response
+        // Hold the lock for the whole sequence so a multi-step session is
+        // never interleaved with another request.
+        return ussdLock.withLock {
+            var lastResponse: String? = null
+            for ((index, step) in steps.withIndex()) {
+                if (index > 0) delay(STEP_DELAY_MS)
+                val result = runSingle(step, simSlot)
+                if (!result.success) {
+                    return@withLock UssdResult(success = false, response = result.response)
+                }
+                lastResponse = result.response
+            }
+            UssdResult(success = true, response = lastResponse)
         }
-        return UssdResult(success = true, response = lastResponse)
     }
 
     private suspend fun runSingle(code: String, simSlot: Int): UssdResult {
@@ -128,7 +141,7 @@ class UssdExecutor(private val context: Context) {
 
     /** Queries the SIM's airtime balance via [BALANCE_CODE]; null on failure. */
     suspend fun fetchAirtimeBalance(simSlot: Int): Double? {
-        val result = runSingle(BALANCE_CODE, simSlot)
+        val result = ussdLock.withLock { runSingle(BALANCE_CODE, simSlot) }
         if (!result.success) return null
         return parseBalance(result.response)
     }
