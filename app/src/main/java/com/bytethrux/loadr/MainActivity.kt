@@ -136,7 +136,7 @@ fun MainHomeView(
 
     when {
         showSplash -> SplashScreen(onFinished = { showSplash = false })
-        uiState.isLoggedIn || true -> { // TEMP: UI verification bypass — REVERT
+        uiState.isLoggedIn -> {
             when (currentScreen) {
                 "Home" -> {
                     LaunchedEffect(Unit) { homeViewModel.refresh() }

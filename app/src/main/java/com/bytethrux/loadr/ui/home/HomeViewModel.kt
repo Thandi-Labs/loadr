@@ -17,7 +17,8 @@ data class HomeUiState(
     val isLoading: Boolean = true,
     val stats: HomeStatsDto? = null,
     val transactions: List<TransactionDto> = emptyList(),
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val isAirtimeRefreshing: Boolean = false,
 )
 
 class HomeViewModel(
@@ -69,6 +70,24 @@ class HomeViewModel(
                         state.copy(stats = state.stats?.copy(airtime_balance = balance))
                     }
                 }
+            }
+        }
+    }
+
+    /** Re-runs the *144# USSD immediately (refresh button on the airtime card). */
+    fun refreshAirtimeBalance() {
+        if (airtimeBalanceProvider == null || _uiState.value.isAirtimeRefreshing) return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isAirtimeRefreshing = true) }
+            try {
+                val balance = airtimeBalanceProvider.refreshBalance(force = true)
+                if (balance != null) {
+                    _uiState.update { state ->
+                        state.copy(stats = state.stats?.copy(airtime_balance = balance))
+                    }
+                }
+            } finally {
+                _uiState.update { it.copy(isAirtimeRefreshing = false) }
             }
         }
     }
