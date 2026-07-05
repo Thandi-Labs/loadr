@@ -53,9 +53,30 @@ class HomeViewModelTest {
     fun `after construction state has stats and transactions loaded`() {
         val state = viewModel.uiState.value
         assertFalse(state.isLoading)
-        assertEquals(mockStats, state.stats)
+        // airtime_used is recomputed from today's transactions; the mock
+        // transaction is dated 2026-06-17, so it contributes nothing.
+        assertEquals(mockStats.copy(airtime_used = 0.0), state.stats)
         assertEquals(mockTransactions, state.transactions)
         assertNull(state.errorMessage)
+    }
+
+    @Test
+    fun `airtime used today is the sum of today's successful transactions`() = runTest {
+        val today = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+            .format(java.util.Date())
+        coEvery { repository.getRecentTransactions() } returns HomeResult.Success(
+            listOf(
+                TransactionDto(1, 1, 1, "A", "0700000001", null, 20.0, "success", today),
+                TransactionDto(2, 1, 2, "B", "0700000002", null, 50.0, "success", today),
+                TransactionDto(3, 1, 3, "C", "0700000003", null, 99.0, "failed", today),
+                TransactionDto(4, 1, 4, "D", "0700000004", null, 500.0, "success", "2026-01-01"),
+            )
+        )
+
+        viewModel.refresh()
+        advanceUntilIdle()
+
+        assertEquals(70.0, viewModel.uiState.value.stats!!.airtime_used, 0.001)
     }
 
     @Test

@@ -39,6 +39,20 @@ object TransactionFilters {
     private const val DATE_PATTERN = "yyyy-MM-dd"
 
     /**
+     * Airtime used today: the sum of amounts across today's *successful*
+     * transactions. Failed USSDs consume no airtime and are excluded.
+     */
+    fun airtimeUsedToday(
+        transactions: List<TransactionDto>,
+        todayMillis: Long = System.currentTimeMillis(),
+    ): Double = apply(
+        transactions,
+        StatusFilter.SUCCESSFUL,
+        DateFilter.TODAY,
+        todayMillis = todayMillis,
+    ).sumOf { it.amount }
+
+    /**
      * Applies status, date and free-text filters. [todayMillis] is injectable
      * for tests; transactions with unparseable dates only survive "All time".
      */

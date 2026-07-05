@@ -107,6 +107,36 @@ class TransactionFiltersTest {
         assertEquals(listOf(1), ids(result))
     }
 
+    // ------------------------------------------------------------------
+    // airtimeUsedToday()
+    // ------------------------------------------------------------------
+
+    @Test
+    fun `airtime used today sums today's successful transactions`() {
+        val txs = listOf(
+            tx(1, "success", "2026-07-05"),
+            tx(2, "success", "2026-07-05"),
+            tx(3, "success", "2026-07-04"),   // yesterday — excluded
+        )
+        assertEquals(200.0, TransactionFilters.airtimeUsedToday(txs, today), 0.001)
+    }
+
+    @Test
+    fun `failed transactions consume no airtime`() {
+        val txs = listOf(
+            tx(1, "success", "2026-07-05"),
+            tx(2, "failed", "2026-07-05"),
+        )
+        assertEquals(100.0, TransactionFilters.airtimeUsedToday(txs, today), 0.001)
+    }
+
+    @Test
+    fun `airtime used today is zero with no transactions today`() {
+        val txs = listOf(tx(1, "success", "2026-07-01"))
+        assertEquals(0.0, TransactionFilters.airtimeUsedToday(txs, today), 0.001)
+        assertEquals(0.0, TransactionFilters.airtimeUsedToday(emptyList(), today), 0.001)
+    }
+
     @Test
     fun `empty message names the active filter`() {
         assertEquals("No successful transactions", StatusFilter.SUCCESSFUL.emptyMessage)
