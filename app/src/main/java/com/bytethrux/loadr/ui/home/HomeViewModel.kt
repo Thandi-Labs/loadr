@@ -10,6 +10,7 @@ import com.bytethrux.loadr.data.local.SubscriptionStore
 import com.bytethrux.loadr.data.repository.HomeRepository
 import com.bytethrux.loadr.data.repository.HomeResult
 import com.bytethrux.loadr.data.repository.SubscriptionsRepository
+import com.bytethrux.loadr.data.transactions.TransactionFilters
 import com.bytethrux.loadr.data.ussd.AirtimeBalanceProvider
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -59,7 +60,13 @@ class HomeViewModel(
             _uiState.update { it.copy(isLoading = true) }
             val statsResult = repository.getStats()
             val txResult = repository.getRecentTransactions()
+            val transactions = (txResult as? HomeResult.Success)?.data ?: emptyList()
             var stats = (statsResult as? HomeResult.Success)?.data
+
+            // Airtime used today = sum of today's successful transactions.
+            stats = stats?.copy(
+                airtime_used = TransactionFilters.airtimeUsedToday(transactions)
+            )
 
             // The airtime balance always comes from the SIM (*144#), never
             // from the backend stats. Show the last known value immediately…
@@ -78,7 +85,7 @@ class HomeViewModel(
                 it.copy(
                     isLoading = false,
                     stats = stats,
-                    transactions = (txResult as? HomeResult.Success)?.data ?: emptyList(),
+                    transactions = transactions,
                     errorMessage = (statsResult as? HomeResult.Error)?.message
                 )
             }
