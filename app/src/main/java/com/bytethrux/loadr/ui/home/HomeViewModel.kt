@@ -10,6 +10,7 @@ import com.bytethrux.loadr.data.local.SubscriptionStore
 import com.bytethrux.loadr.data.repository.HomeRepository
 import com.bytethrux.loadr.data.repository.HomeResult
 import com.bytethrux.loadr.data.repository.SubscriptionsRepository
+import com.bytethrux.loadr.data.transactions.StatusFilter
 import com.bytethrux.loadr.data.transactions.TransactionFilters
 import com.bytethrux.loadr.data.ussd.AirtimeBalanceProvider
 import kotlinx.coroutines.flow.*
@@ -63,9 +64,12 @@ class HomeViewModel(
             val transactions = (txResult as? HomeResult.Success)?.data ?: emptyList()
             var stats = (statsResult as? HomeResult.Success)?.data
 
-            // Airtime used today = sum of today's successful transactions.
+            // Today's tallies come from the actual transactions: counts for
+            // the Successful/Failed cards and the airtime spent.
             stats = stats?.copy(
-                airtime_used = TransactionFilters.airtimeUsedToday(transactions)
+                successful_today = TransactionFilters.countToday(transactions, StatusFilter.SUCCESSFUL),
+                failed_today = TransactionFilters.countToday(transactions, StatusFilter.FAILED),
+                airtime_used = TransactionFilters.airtimeUsedToday(transactions),
             )
 
             // The airtime balance always comes from the SIM (*144#), never
@@ -74,12 +78,14 @@ class HomeViewModel(
                 val cached = airtimeBalanceProvider.cachedBalance()
                 stats = stats?.copy(airtime_balance = cached ?: 0.0)
             }
-            // Tokens reflect the backend entitlement (requests remaining),
-            // synced here and served from the cache when offline.
+            // Tokens: the exact remainder while subscribed (each USSD
+            // subtracts one), zero when the subscription has lapsed.
             if (subscriptionsRepository != null) {
-                stats = stats?.copy(token_balance = subscriptionsRepository.syncMySubscription().tokens)
+                stats = stats?.copy(
+                    token_balance = subscriptionsRepository.syncMySubscription().availableTokens()
+                )
             } else if (subscriptionStore != null) {
-                stats = stats?.copy(token_balance = subscriptionStore.current().tokens)
+                stats = stats?.copy(token_balance = subscriptionStore.current().availableTokens())
             }
             _uiState.update {
                 it.copy(

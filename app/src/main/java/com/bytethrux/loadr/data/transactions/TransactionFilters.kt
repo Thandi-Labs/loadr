@@ -52,6 +52,13 @@ object TransactionFilters {
         todayMillis = todayMillis,
     ).sumOf { it.amount }
 
+    /** Number of today's transactions with the given status. */
+    fun countToday(
+        transactions: List<TransactionDto>,
+        status: StatusFilter,
+        todayMillis: Long = System.currentTimeMillis(),
+    ): Int = apply(transactions, status, DateFilter.TODAY, todayMillis = todayMillis).size
+
     /**
      * Applies status, date and free-text filters. [todayMillis] is injectable
      * for tests; transactions with unparseable dates only survive "All time".

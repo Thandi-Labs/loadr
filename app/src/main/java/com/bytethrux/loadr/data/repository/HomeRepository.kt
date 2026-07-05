@@ -36,10 +36,12 @@ class HomeRepository(
     }
 
     private fun mockStats() = HomeStatsDto(
-        successful_today = 3,
+        // successful/failed counts and airtime_used are replaced at runtime
+        // with tallies computed from today's transactions; token_balance
+        // with the remaining subscription tokens.
+        successful_today = 0,
         failed_today = 0,
-        token_balance = 518,
-        // Replaced at runtime with the sum of today's successful transactions
+        token_balance = 0,
         airtime_used = 0.0,
         // Replaced at runtime with the real SIM balance read via *144#
         airtime_balance = 0.0,

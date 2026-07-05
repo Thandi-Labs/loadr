@@ -51,4 +51,59 @@ class SubscriptionStateTest {
         val state = SubscriptionState(expiryAt = now + remaining, tokens = 0)
         assertEquals("2d 05h 31min", state.remainingLabel(now))
     }
+
+    // ------------------------------------------------------------------
+    // availableTokens()
+    // ------------------------------------------------------------------
+
+    @Test
+    fun `available tokens is the exact remainder while subscribed`() {
+        val state = SubscriptionState(expiryAt = now + 1_000, tokens = 287)
+        assertEquals(287, state.availableTokens(now))
+    }
+
+    @Test
+    fun `available tokens is zero once the subscription lapses`() {
+        val state = SubscriptionState(expiryAt = now - 1_000, tokens = 150)
+        assertEquals(0, state.availableTokens(now))
+    }
+
+    // ------------------------------------------------------------------
+    // SubscriptionStore.reconcileTokens()
+    // ------------------------------------------------------------------
+
+    @Test
+    fun `same subscription window keeps the locally decremented count`() {
+        // Backend still says 300; we've executed 13 USSDs since the sync.
+        assertEquals(
+            287,
+            SubscriptionStore.reconcileTokens(
+                cachedExpiryAt = 111L, cachedTokens = 287,
+                backendExpiryAt = 111L, backendTokens = 300,
+            )
+        )
+    }
+
+    @Test
+    fun `same window trusts the backend when it is lower`() {
+        // e.g. another device consumed more, or the backend starts decrementing.
+        assertEquals(
+            250,
+            SubscriptionStore.reconcileTokens(
+                cachedExpiryAt = 111L, cachedTokens = 287,
+                backendExpiryAt = 111L, backendTokens = 250,
+            )
+        )
+    }
+
+    @Test
+    fun `a new subscription window adopts the backend count`() {
+        assertEquals(
+            600,
+            SubscriptionStore.reconcileTokens(
+                cachedExpiryAt = 111L, cachedTokens = 2,
+                backendExpiryAt = 999L, backendTokens = 600,
+            )
+        )
+    }
 }

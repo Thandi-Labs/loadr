@@ -24,6 +24,13 @@ data class SubscriptionState(
     fun hasCapability(now: Long = System.currentTimeMillis()): Boolean =
         isTimePlanActive(now) && tokens > 0
 
+    /**
+     * Tokens usable right now: the remaining count while the subscription is
+     * active, zero once it lapses (tokens only exist within a subscription).
+     */
+    fun availableTokens(now: Long = System.currentTimeMillis()): Int =
+        if (isTimePlanActive(now)) tokens else 0
+
     fun timeRemainingMs(now: Long = System.currentTimeMillis()): Long =
         (expiryAt - now).coerceAtLeast(0L)
 
@@ -47,6 +54,25 @@ class SubscriptionStore(private val context: Context) {
     companion object {
         private val SUB_EXPIRY_AT = longPreferencesKey("subscription_expiry_at")
         private val TOKENS = intPreferencesKey("subscription_tokens")
+
+        /**
+         * Reconciles the backend token count with the local one. The backend
+         * has no decrement endpoint yet, so within the same subscription
+         * window (same expiry) the local count — which subtracts one per
+         * executed USSD — is the accurate remainder and the smaller of the
+         * two wins. A different expiry means a new subscription: adopt the
+         * backend count wholesale.
+         */
+        fun reconcileTokens(
+            cachedExpiryAt: Long,
+            cachedTokens: Int,
+            backendExpiryAt: Long,
+            backendTokens: Int,
+        ): Int = if (backendExpiryAt == cachedExpiryAt) {
+            minOf(cachedTokens, backendTokens)
+        } else {
+            backendTokens
+        }
     }
 
     val state: Flow<SubscriptionState> = context.dataStore.data.map { prefs ->
@@ -58,11 +84,20 @@ class SubscriptionStore(private val context: Context) {
 
     suspend fun current(): SubscriptionState = state.first()
 
-    /** Mirrors the backend's active subscription into the cache. */
+    /**
+     * Mirrors the backend's active subscription into the cache, keeping the
+     * locally decremented token count when it is the accurate remainder.
+     */
     suspend fun setFromBackend(expiryAt: Long, requestsRemaining: Int) {
         context.dataStore.edit { prefs ->
+            val reconciled = reconcileTokens(
+                cachedExpiryAt = prefs[SUB_EXPIRY_AT] ?: 0L,
+                cachedTokens = prefs[TOKENS] ?: 0,
+                backendExpiryAt = expiryAt,
+                backendTokens = requestsRemaining,
+            )
             prefs[SUB_EXPIRY_AT] = expiryAt
-            prefs[TOKENS] = requestsRemaining
+            prefs[TOKENS] = reconciled
         }
     }
 

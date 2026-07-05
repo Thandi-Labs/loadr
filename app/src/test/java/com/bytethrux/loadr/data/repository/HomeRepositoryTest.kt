@@ -39,12 +39,13 @@ class HomeRepositoryTest {
     @Test
     fun `getStats returns expected hardcoded values`() = runTest {
         val data = (repository.getStats() as HomeResult.Success).data
-        assertEquals(3, data.successful_today)
+        // Placeholders only: the dashboard replaces the tallies with counts
+        // from today's transactions, token_balance with the subscription
+        // remainder, airtime_used with today's successful sum, and
+        // airtime_balance with the real SIM reading from the *144# USSD.
+        assertEquals(0, data.successful_today)
         assertEquals(0, data.failed_today)
-        assertEquals(518, data.token_balance)
-        // Placeholders only: the dashboard replaces airtime_used with the sum
-        // of today's successful transactions and airtime_balance with the
-        // real SIM reading from the *144# USSD.
+        assertEquals(0, data.token_balance)
         assertEquals(0.0, data.airtime_used, 0.001)
         assertEquals(0.0, data.airtime_balance, 0.001)
         assertEquals(24.0, data.weekly_commission, 0.001)
