@@ -45,6 +45,17 @@ class HomeViewModel(
                 }
             }
         }
+        // When the background service finishes a payment, refetch everything
+        // that changed: token balance, today's tallies, airtime used and the
+        // transactions list.
+        if (subscriptionStore != null) {
+            viewModelScope.launch {
+                subscriptionStore.lastPaymentAt
+                    .distinctUntilChanged()
+                    .drop(1) // skip the stored value at startup
+                    .collect { refresh() }
+            }
+        }
     }
 
     /** Masks/unmasks the airtime figures on the dashboard; persisted. */

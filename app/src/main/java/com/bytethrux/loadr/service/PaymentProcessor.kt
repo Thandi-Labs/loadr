@@ -78,8 +78,16 @@ class PaymentProcessor(
             multiStep = settings.processingMode == ProcessingMode.ADVANCED,
         )
 
-        // 5. Tokens and the transaction record.
-        if (result.success) subscriptionStore.consumeToken()
+        // 5. Tokens and the transaction record. The local decrement lands
+        //    first (works offline), then the backend is decremented via
+        //    PUT /subscriptions/consume-token and the authoritative
+        //    remainder is refetched.
+        if (result.success) {
+            subscriptionStore.consumeToken()
+            if (subscriptionsRepository.consumeTokenRemote()) {
+                subscriptionsRepository.syncMySubscription()
+            }
+        }
 
         try {
             api.createTransaction(

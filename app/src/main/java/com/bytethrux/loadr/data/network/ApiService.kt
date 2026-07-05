@@ -149,6 +149,11 @@ interface ApiService {
         @Header("Authorization") token: String,
         @Path("id") subscriptionId: Int
     )
+
+    @PUT("subscriptions/consume-token")
+    suspend fun consumeToken(
+        @Header("Authorization") token: String
+    )
 }
 
 

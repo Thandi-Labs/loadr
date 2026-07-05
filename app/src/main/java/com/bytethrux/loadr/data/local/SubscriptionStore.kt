@@ -54,6 +54,7 @@ class SubscriptionStore(private val context: Context) {
     companion object {
         private val SUB_EXPIRY_AT = longPreferencesKey("subscription_expiry_at")
         private val TOKENS = intPreferencesKey("subscription_tokens")
+        private val LAST_PAYMENT_AT = longPreferencesKey("last_payment_at")
 
         /**
          * Reconciles the backend token count with the local one. The backend
@@ -83,6 +84,16 @@ class SubscriptionStore(private val context: Context) {
     }
 
     suspend fun current(): SubscriptionState = state.first()
+
+    /**
+     * Bumped after the background service finishes a payment so open screens
+     * (dashboard, transactions) know to refetch tokens, tallies and lists.
+     */
+    val lastPaymentAt: Flow<Long?> = context.dataStore.data.map { it[LAST_PAYMENT_AT] }
+
+    suspend fun notifyPaymentProcessed() {
+        context.dataStore.edit { it[LAST_PAYMENT_AT] = System.currentTimeMillis() }
+    }
 
     /**
      * Mirrors the backend's active subscription into the cache, keeping the
