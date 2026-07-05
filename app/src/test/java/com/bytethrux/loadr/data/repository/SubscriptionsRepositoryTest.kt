@@ -139,6 +139,30 @@ class SubscriptionsRepositoryTest {
     }
 
     // ------------------------------------------------------------------
+    // consumeTokenRemote()
+    // ------------------------------------------------------------------
+
+    @Test
+    fun `consumeTokenRemote hits the PUT endpoint and returns true`() = runTest {
+        coEvery { api.consumeToken(any()) } returns Unit
+        assertTrue(repository.consumeTokenRemote())
+        coVerify(exactly = 1) { api.consumeToken("Bearer token-123") }
+    }
+
+    @Test
+    fun `consumeTokenRemote returns false on backend failure`() = runTest {
+        coEvery { api.consumeToken(any()) } throws httpException(500)
+        assertEquals(false, repository.consumeTokenRemote())
+    }
+
+    @Test
+    fun `consumeTokenRemote without auth skips the call`() = runTest {
+        every { tokenDataStore.accessToken } returns flowOf(null)
+        assertEquals(false, repository.consumeTokenRemote())
+        coVerify(exactly = 0) { api.consumeToken(any()) }
+    }
+
+    // ------------------------------------------------------------------
     // purchase()
     // ------------------------------------------------------------------
 

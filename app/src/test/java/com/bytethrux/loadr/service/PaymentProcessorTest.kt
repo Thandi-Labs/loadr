@@ -66,6 +66,7 @@ class PaymentProcessorTest {
 
         every { tokenDataStore.accessToken } returns flowOf("tkn")
         coEvery { subscriptionsRepository.syncMySubscription() } returns activeEntitlement
+        coEvery { subscriptionsRepository.consumeTokenRemote() } returns true
         coEvery { api.getOffers(any()) } returns offers
         coEvery { api.createTransaction(any(), any()) } returns Unit
     }
@@ -134,6 +135,29 @@ class PaymentProcessorTest {
     }
 
     @Test
+    fun `successful USSD decrements the backend and refetches the remainder`() = runTest {
+        coEvery { ussdExecutor.run(any(), any(), any()) } returns UssdResult(true)
+
+        processor.process(50.0, "0712345678", "JOHN DOE", settings)
+
+        coVerify(exactly = 1) { subscriptionsRepository.consumeTokenRemote() }
+        // Once for the entitlement gate, once to refetch after the decrement.
+        coVerify(exactly = 2) { subscriptionsRepository.syncMySubscription() }
+    }
+
+    @Test
+    fun `failed remote decrement skips the refetch but keeps the local decrement`() = runTest {
+        coEvery { ussdExecutor.run(any(), any(), any()) } returns UssdResult(true)
+        coEvery { subscriptionsRepository.consumeTokenRemote() } returns false
+
+        val outcome = processor.process(50.0, "0712345678", "JOHN DOE", settings)
+
+        assertTrue(outcome is PaymentProcessor.Outcome.Sent)
+        coVerify(exactly = 1) { subscriptionStore.consumeToken() }
+        coVerify(exactly = 1) { subscriptionsRepository.syncMySubscription() } // gate only
+    }
+
+    @Test
     fun `onSending fires with the offer name before the USSD runs`() = runTest {
         coEvery { ussdExecutor.run(any(), any(), any()) } returns UssdResult(true)
         var sending: String? = null
@@ -158,6 +182,7 @@ class PaymentProcessorTest {
         assertTrue(outcome is PaymentProcessor.Outcome.UssdFailed)
         assertEquals("failed", txSlot.captured.status)
         coVerify(exactly = 0) { subscriptionStore.consumeToken() }
+        coVerify(exactly = 0) { subscriptionsRepository.consumeTokenRemote() }
     }
 
     @Test

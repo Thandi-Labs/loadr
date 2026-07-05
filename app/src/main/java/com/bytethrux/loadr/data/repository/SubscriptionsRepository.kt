@@ -70,6 +70,21 @@ class SubscriptionsRepository(
         }
     }
 
+    /**
+     * Decrements one token on the backend (PUT /subscriptions/consume-token)
+     * after a USSD executes. Best-effort: the local decrement has already
+     * happened and the min-rule reconciliation absorbs any miss.
+     */
+    suspend fun consumeTokenRemote(): Boolean {
+        val token = tokenDataStore.accessToken.first() ?: return false
+        return try {
+            api.consumeToken("Bearer $token")
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     /** Records a purchase on the backend after the activation USSD succeeds. */
     suspend fun purchase(subscriptionId: Int): HomeResult<Unit> {
         val token = tokenDataStore.accessToken.first()

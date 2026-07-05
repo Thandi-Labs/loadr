@@ -169,6 +169,14 @@ class LoadrService : Service() {
             is PaymentProcessor.Outcome.UssdFailed ->
                 notify(statusId, "Loadr - USSD failed for ${outcome.offer.offer_name} → $phone")
         }
+
+        // A transaction was recorded (and on success a token consumed) —
+        // signal open screens to refetch tokens, tallies and transactions.
+        if (outcome is PaymentProcessor.Outcome.Sent ||
+            outcome is PaymentProcessor.Outcome.UssdFailed
+        ) {
+            subscriptionStore.notifyPaymentProcessed()
+        }
     }
 
     private fun sendAutoReply(phone: String, name: String, offerName: String, simSlot: Int) {

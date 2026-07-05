@@ -104,6 +104,30 @@ class HomeViewModelTest {
     }
 
     @Test
+    fun `payment event from the background service triggers a full refresh`() = runTest {
+        val store = mockk<com.bytethrux.loadr.data.local.SubscriptionStore>()
+        val paymentSignal =
+            kotlinx.coroutines.flow.MutableStateFlow<Long?>(null)
+        every { store.lastPaymentAt } returns paymentSignal
+        coEvery { store.current() } returns com.bytethrux.loadr.data.local.SubscriptionState()
+
+        // Drop calls recorded by the setUp() view model instance.
+        clearMocks(repository, answers = false, recordedCalls = true)
+
+        viewModel = HomeViewModel(repository, subscriptionStore = store)
+        advanceUntilIdle()
+        coVerify(exactly = 1) { repository.getRecentTransactions() }
+
+        // Background service finishes a payment.
+        paymentSignal.value = 12345L
+        advanceUntilIdle()
+
+        // Stats + transactions (tokens, tallies, airtime used) refetched.
+        coVerify(exactly = 2) { repository.getRecentTransactions() }
+        coVerify(exactly = 2) { repository.getStats() }
+    }
+
+    @Test
     fun `tokens card shows the exact remainder while subscribed`() = runTest {
         val subsRepo = mockk<com.bytethrux.loadr.data.repository.SubscriptionsRepository>()
         coEvery { subsRepo.syncMySubscription() } returns
