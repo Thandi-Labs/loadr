@@ -47,6 +47,25 @@ data class OfferDto(
     val user_id: Int? = null
 )
 
+data class SubscriptionPlanDto(
+    val id: Int,
+    val name: String,
+    val description: String,
+    val request_count: Int,
+    val price: Double,
+    val duration_days: Int,
+    val active: Boolean = true,
+)
+
+data class UserSubscriptionDto(
+    val id: Int,
+    val user_id: Int,
+    val subscription_id: Int,
+    val requests_remaining: Int,
+    val start_date: String,   // ISO datetime
+    val expiry_date: String,  // ISO datetime
+)
+
 data class CreateTransactionRequest(
     val offer_id: Int,
     val customer_name: String,
@@ -115,6 +134,20 @@ interface ApiService {
     suspend fun createTransaction(
         @Header("Authorization") token: String,
         @Body transaction: CreateTransactionRequest
+    )
+
+    @GET("subscriptions/")
+    suspend fun getSubscriptionPlans(): List<SubscriptionPlanDto>
+
+    @GET("subscriptions/my-subscription")
+    suspend fun getMySubscription(
+        @Header("Authorization") token: String
+    ): UserSubscriptionDto
+
+    @POST("subscriptions/purchase/{id}")
+    suspend fun purchaseSubscription(
+        @Header("Authorization") token: String,
+        @Path("id") subscriptionId: Int
     )
 }
 

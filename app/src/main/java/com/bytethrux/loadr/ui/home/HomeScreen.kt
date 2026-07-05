@@ -45,7 +45,9 @@ fun HomeScreen(
     viewModel: HomeViewModel,
     username: String,
     onLogout: () -> Unit,
-    onNavigate: (String) -> Unit
+    onNavigate: (String) -> Unit,
+    onOpenTransactions: (com.bytethrux.loadr.data.transactions.StatusFilter) -> Unit = {},
+    onOpenSubscriptions: () -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -94,7 +96,16 @@ fun HomeScreen(
                 ) {
                     item {
                         uiState.stats?.let { stats ->
-                            StatCardsRow(stats)
+                            StatCardsRow(
+                                stats = stats,
+                                onSuccessfulClick = {
+                                    onOpenTransactions(com.bytethrux.loadr.data.transactions.StatusFilter.SUCCESSFUL)
+                                },
+                                onFailedClick = {
+                                    onOpenTransactions(com.bytethrux.loadr.data.transactions.StatusFilter.FAILED)
+                                },
+                                onTokensClick = onOpenSubscriptions,
+                            )
                         }
                     }
                     item {
@@ -109,7 +120,9 @@ fun HomeScreen(
                     }
                     item {
                         TransactionHeader(
-                            onSeeAll = { /* TODO: navigate to full list */ }
+                            onSeeAll = {
+                                onOpenTransactions(com.bytethrux.loadr.data.transactions.StatusFilter.ALL)
+                            }
                         )
                     }
                     items(uiState.transactions.take(5)) { tx ->
@@ -180,7 +193,12 @@ private fun HomeTopBar(username: String, onMenuClick: () -> Unit) {
 // ── STAT CARDS ────────────────────────────────────────────
 
 @Composable
-private fun StatCardsRow(stats: HomeStatsDto) {
+private fun StatCardsRow(
+    stats: HomeStatsDto,
+    onSuccessfulClick: () -> Unit,
+    onFailedClick: () -> Unit,
+    onTokensClick: () -> Unit,
+) {
     val colors = LocalLoadrColors.current
     Row(
         modifier = Modifier
@@ -194,6 +212,7 @@ private fun StatCardsRow(stats: HomeStatsDto) {
             valueColor = LoadrGreen,
             borderColor = LoadrGreen,
             bgColor = colors.successBg,
+            onClick = onSuccessfulClick,
             modifier = Modifier.weight(1f)
         )
         StatCard(
@@ -202,6 +221,7 @@ private fun StatCardsRow(stats: HomeStatsDto) {
             valueColor = LoadrRed,
             borderColor = LoadrRed,
             bgColor = colors.errorBg,
+            onClick = onFailedClick,
             modifier = Modifier.weight(1f)
         )
         StatCard(
@@ -210,6 +230,7 @@ private fun StatCardsRow(stats: HomeStatsDto) {
             valueColor = colors.infoText,
             borderColor = colors.infoBorder,
             bgColor = colors.infoBg,
+            onClick = onTokensClick,
             modifier = Modifier.weight(1f)
         )
     }
@@ -222,6 +243,7 @@ private fun StatCard(
     valueColor: Color,
     borderColor: Color,
     bgColor: Color,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -229,6 +251,7 @@ private fun StatCard(
             .clip(RoundedCornerShape(12.dp))
             .background(bgColor)
             .border(1.dp, borderColor.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 14.dp)
     ) {
         Text(value, fontSize = 26.sp, fontWeight = FontWeight.Bold, color = valueColor)

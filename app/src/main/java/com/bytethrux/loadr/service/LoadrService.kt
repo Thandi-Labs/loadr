@@ -17,10 +17,12 @@ import com.bytethrux.loadr.MainActivity
 import com.bytethrux.loadr.R
 import com.bytethrux.loadr.data.local.ProcessingMode
 import com.bytethrux.loadr.data.local.SettingsDataStore
+import com.bytethrux.loadr.data.local.SubscriptionStore
 import com.bytethrux.loadr.data.local.TokenDataStore
 import com.bytethrux.loadr.data.network.CreateTransactionRequest
 import com.bytethrux.loadr.data.network.RetrofitClient
 import com.bytethrux.loadr.data.offers.OfferMatcher
+import com.bytethrux.loadr.data.repository.SubscriptionsRepository
 import com.bytethrux.loadr.data.sim.SimManager
 import com.bytethrux.loadr.data.ussd.UssdExecutor
 import kotlinx.coroutines.CoroutineScope
@@ -120,6 +122,24 @@ class LoadrService : Service() {
 
     private suspend fun processPayment(amount: Double, phone: String, customerName: String) {
         val statusId = nextStatusNotificationId.getAndIncrement()
+
+        // Without an active subscription with requests remaining the app must
+        // not process payments. The entitlement is synced from the backend;
+        // when offline the cached copy is used.
+        val subscriptionStore = SubscriptionStore(applicationContext)
+        val entitlement = SubscriptionsRepository(
+            RetrofitClient.instance,
+            TokenDataStore(applicationContext),
+            subscriptionStore,
+        ).syncMySubscription()
+        if (!entitlement.hasCapability()) {
+            notify(
+                statusId,
+                "Loadr - No active subscription or tokens. Ksh${amount.toLong()} from $phone was not processed."
+            )
+            return
+        }
+
         val settings = SettingsDataStore(applicationContext).settings.first()
 
         if (settings.autoSaveContacts) {
@@ -157,6 +177,9 @@ class LoadrService : Service() {
             simSlot = settings.bingwaSimSlot,
             multiStep = settings.processingMode == ProcessingMode.ADVANCED,
         )
+        // Each executed USSD uses up one request locally; the backend count
+        // is authoritative and overwrites this on the next sync.
+        subscriptionStore.consumeToken()
         val status = if (result.success) "success" else "failed"
 
         try {
