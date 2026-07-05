@@ -149,6 +149,39 @@ class HomeViewModelTest {
     }
 
     @Test
+    fun `refreshAirtimeBalance forces a new USSD reading and updates state`() = runTest {
+        val provider = mockk<AirtimeBalanceProvider>()
+        coEvery { provider.cachedBalance() } returns 10.0
+        coEvery { provider.refreshBalance() } returns 10.0
+        viewModel = HomeViewModel(repository, provider)
+        advanceUntilIdle()
+
+        coEvery { provider.refreshBalance(force = true) } returns 55.5
+        viewModel.refreshAirtimeBalance()
+        advanceUntilIdle()
+
+        coVerify { provider.refreshBalance(force = true) }
+        assertEquals(55.5, viewModel.uiState.value.stats!!.airtime_balance, 0.001)
+        assertFalse(viewModel.uiState.value.isAirtimeRefreshing)
+    }
+
+    @Test
+    fun `refreshAirtimeBalance keeps the current value when the USSD fails`() = runTest {
+        val provider = mockk<AirtimeBalanceProvider>()
+        coEvery { provider.cachedBalance() } returns 10.0
+        coEvery { provider.refreshBalance() } returns 10.0
+        viewModel = HomeViewModel(repository, provider)
+        advanceUntilIdle()
+
+        coEvery { provider.refreshBalance(force = true) } returns null
+        viewModel.refreshAirtimeBalance()
+        advanceUntilIdle()
+
+        assertEquals(10.0, viewModel.uiState.value.stats!!.airtime_balance, 0.001)
+        assertFalse(viewModel.uiState.value.isAirtimeRefreshing)
+    }
+
+    @Test
     fun `transaction error does not set errorMessage`() = runTest {
         coEvery { repository.getStats() } returns HomeResult.Success(mockStats)
         coEvery { repository.getRecentTransactions() } returns HomeResult.Error("Timeout")

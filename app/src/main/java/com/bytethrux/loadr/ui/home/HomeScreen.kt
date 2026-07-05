@@ -19,6 +19,7 @@ import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Logout
 import androidx.compose.material.icons.outlined.Menu
 import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Reply
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Storefront
@@ -110,7 +111,11 @@ fun HomeScreen(
                     }
                     item {
                         uiState.stats?.let { stats ->
-                            AirtimeRow(stats)
+                            AirtimeRow(
+                                stats = stats,
+                                isRefreshing = uiState.isAirtimeRefreshing,
+                                onRefreshBalance = { viewModel.refreshAirtimeBalance() },
+                            )
                         }
                     }
                     item {
@@ -267,7 +272,11 @@ private fun StatCard(
 // ── AIRTIME ROW ───────────────────────────────────────────
 
 @Composable
-private fun AirtimeRow(stats: HomeStatsDto) {
+private fun AirtimeRow(
+    stats: HomeStatsDto,
+    isRefreshing: Boolean,
+    onRefreshBalance: () -> Unit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -275,21 +284,56 @@ private fun AirtimeRow(stats: HomeStatsDto) {
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         AirtimeCard("Airtime used today", "Ksh %.2f".format(stats.airtime_used), Modifier.weight(1f))
-        AirtimeCard("Airtime balance", "Ksh %.2f".format(stats.airtime_balance), Modifier.weight(1f))
+        AirtimeCard(
+            label = "Airtime balance",
+            value = "Ksh %.2f".format(stats.airtime_balance),
+            modifier = Modifier.weight(1f),
+            isRefreshing = isRefreshing,
+            onRefresh = onRefreshBalance,
+        )
     }
 }
 
 @Composable
-private fun AirtimeCard(label: String, value: String, modifier: Modifier = Modifier) {
-    Column(
+private fun AirtimeCard(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    isRefreshing: Boolean = false,
+    onRefresh: (() -> Unit)? = null,
+) {
+    Row(
         modifier = modifier
             .clip(RoundedCornerShape(10.dp))
             .background(LoadrNavyCard)
             .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(label.uppercase(), fontSize = 9.sp, color = LoadrSlate, letterSpacing = 0.4.sp)
-        Text(value, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = LoadrWhite)
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(label.uppercase(), fontSize = 9.sp, color = LoadrSlate, letterSpacing = 0.4.sp)
+            Text(value, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = LoadrWhite)
+        }
+        if (onRefresh != null) {
+            if (isRefreshing) {
+                CircularProgressIndicator(
+                    color = LoadrGreen,
+                    strokeWidth = 2.dp,
+                    modifier = Modifier.size(18.dp)
+                )
+            } else {
+                IconButton(onClick = onRefresh, modifier = Modifier.size(28.dp)) {
+                    Icon(
+                        imageVector = androidx.compose.material.icons.Icons.Outlined.Refresh,
+                        contentDescription = "Refresh airtime balance",
+                        tint = LoadrGreen,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        }
     }
 }
 
