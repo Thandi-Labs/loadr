@@ -190,7 +190,7 @@ fun SubscriptionsScreen(
                     buildAnnotatedString {
                         withStyle(
                             SpanStyle(color = LoadrGreen, fontWeight = FontWeight.Bold)
-                        ) { append("${subscription.tokens}") }
+                        ) { append("${subscription.availableTokens(now)}") }
                         withStyle(SpanStyle(color = LoadrSlate)) { append(" Requests Left") }
                     },
                     fontSize = 13.sp
