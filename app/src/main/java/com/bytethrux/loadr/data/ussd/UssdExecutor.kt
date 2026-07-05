@@ -44,15 +44,31 @@ class UssdExecutor(private val context: Context) {
 
         private val STEP_SEPARATOR = Regex("""[;\n]+""")
 
-        // "Your account balance is Ksh 284.29" / "balance: Kshs. 1,024.50"
-        private val BALANCE_REGEX = Regex("""[Kk][Ss][Hh][Ss]?\.?\s*([\d,]+(?:\.\d{1,2})?)""")
+        // Carriers word the *144# reply differently; try the most specific
+        // shape first. Safaricom: "Airtime Bal: 5.10 KSH. Expire ...".
+        private val BALANCE_PATTERNS = listOf(
+            // Amount tied to a "Bal"/"Balance" keyword, currency optional on
+            // either side: "Airtime Bal: 5.10 KSH", "balance is Ksh 284.29"
+            Regex(
+                """Bal\w*\s*:?\s*(?:is\s+)?(?:Kshs?\.?\s*)?([\d,]+(?:\.\d{1,2})?)""",
+                RegexOption.IGNORE_CASE
+            ),
+            // Currency before the amount: "Ksh 284.29", "Kshs. 1,024.50"
+            Regex("""Kshs?\.?\s*([\d,]+(?:\.\d{1,2})?)""", RegexOption.IGNORE_CASE),
+            // Amount before the currency: "5.10 KSH"
+            Regex("""([\d,]+(?:\.\d{1,2})?)\s*Kshs?""", RegexOption.IGNORE_CASE),
+        )
 
         fun parseBalance(response: String?): Double? {
             if (response == null) return null
-            return BALANCE_REGEX.find(response)
-                ?.groupValues?.get(1)
-                ?.replace(",", "")
-                ?.toDoubleOrNull()
+            for (pattern in BALANCE_PATTERNS) {
+                val amount = pattern.find(response)
+                    ?.groupValues?.get(1)
+                    ?.replace(",", "")
+                    ?.toDoubleOrNull()
+                if (amount != null) return amount
+            }
+            return null
         }
     }
 
