@@ -5,8 +5,10 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.bytethrux.loadr.data.network.HomeStatsDto
 import com.bytethrux.loadr.data.network.TransactionDto
+import com.bytethrux.loadr.data.local.SubscriptionStore
 import com.bytethrux.loadr.data.repository.HomeRepository
 import com.bytethrux.loadr.data.repository.HomeResult
+import com.bytethrux.loadr.data.repository.SubscriptionsRepository
 import com.bytethrux.loadr.data.ussd.AirtimeBalanceProvider
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -21,6 +23,8 @@ data class HomeUiState(
 class HomeViewModel(
     private val repository: HomeRepository,
     private val airtimeBalanceProvider: AirtimeBalanceProvider? = null,
+    private val subscriptionStore: SubscriptionStore? = null,
+    private val subscriptionsRepository: SubscriptionsRepository? = null,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -40,6 +44,13 @@ class HomeViewModel(
             if (airtimeBalanceProvider != null) {
                 val cached = airtimeBalanceProvider.cachedBalance()
                 stats = stats?.copy(airtime_balance = cached ?: 0.0)
+            }
+            // Tokens reflect the backend entitlement (requests remaining),
+            // synced here and served from the cache when offline.
+            if (subscriptionsRepository != null) {
+                stats = stats?.copy(token_balance = subscriptionsRepository.syncMySubscription().tokens)
+            } else if (subscriptionStore != null) {
+                stats = stats?.copy(token_balance = subscriptionStore.current().tokens)
             }
             _uiState.update {
                 it.copy(
@@ -65,9 +76,13 @@ class HomeViewModel(
     class Factory(
         private val repository: HomeRepository,
         private val airtimeBalanceProvider: AirtimeBalanceProvider? = null,
+        private val subscriptionStore: SubscriptionStore? = null,
+        private val subscriptionsRepository: SubscriptionsRepository? = null,
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>) =
-            HomeViewModel(repository, airtimeBalanceProvider) as T
+            HomeViewModel(
+                repository, airtimeBalanceProvider, subscriptionStore, subscriptionsRepository
+            ) as T
     }
 }

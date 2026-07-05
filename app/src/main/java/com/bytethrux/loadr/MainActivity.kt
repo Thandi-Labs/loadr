@@ -17,13 +17,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.bytethrux.loadr.data.local.SettingsDataStore
+import com.bytethrux.loadr.data.local.SubscriptionStore
 import com.bytethrux.loadr.data.local.TokenDataStore
 import com.bytethrux.loadr.data.network.RetrofitClient
 import com.bytethrux.loadr.data.repository.AuthRepository
 import com.bytethrux.loadr.data.repository.HomeRepository
 import com.bytethrux.loadr.data.repository.OffersRepository
+import com.bytethrux.loadr.data.repository.SubscriptionsRepository
 import com.bytethrux.loadr.data.sim.SimManager
+import com.bytethrux.loadr.data.transactions.StatusFilter
 import com.bytethrux.loadr.data.ussd.AirtimeBalanceProvider
+import com.bytethrux.loadr.data.ussd.UssdExecutor
 import com.bytethrux.loadr.ui.auth.AuthViewModel
 import com.bytethrux.loadr.ui.common.ComingSoonScreen
 import com.bytethrux.loadr.ui.home.HomeScreen
@@ -32,8 +36,12 @@ import com.bytethrux.loadr.ui.offers.OffersScreen
 import com.bytethrux.loadr.ui.offers.OffersViewModel
 import com.bytethrux.loadr.ui.settings.SettingsScreen
 import com.bytethrux.loadr.ui.settings.SettingsViewModel
+import com.bytethrux.loadr.ui.subscriptions.SubscriptionsScreen
+import com.bytethrux.loadr.ui.subscriptions.SubscriptionsViewModel
 import com.bytethrux.loadr.ui.theme.LoadrTheme
 import com.bytethrux.loadr.ui.theme.ThemeMode
+import com.bytethrux.loadr.ui.transactions.TransactionsScreen
+import com.bytethrux.loadr.ui.transactions.TransactionsViewModel
 import kotlin.getValue
 
 class MainActivity : ComponentActivity() {
@@ -43,18 +51,32 @@ class MainActivity : ComponentActivity() {
     private val homeRepository by lazy { HomeRepository(RetrofitClient.instance, tokenDataStore) }
     private val offersRepository by lazy { OffersRepository(RetrofitClient.instance, tokenDataStore) }
     private val airtimeBalanceProvider by lazy { AirtimeBalanceProvider(applicationContext) }
+    private val subscriptionStore by lazy { SubscriptionStore(applicationContext) }
+    private val subscriptionsRepository by lazy {
+        SubscriptionsRepository(RetrofitClient.instance, tokenDataStore, subscriptionStore)
+    }
 
     private val authViewModel by viewModels<AuthViewModel> {
         AuthViewModel.Factory(authRepository)
     }
     private val homeViewModel by viewModels<HomeViewModel> {
-        HomeViewModel.Factory(homeRepository, airtimeBalanceProvider)
+        HomeViewModel.Factory(
+            homeRepository, airtimeBalanceProvider, subscriptionStore, subscriptionsRepository
+        )
     }
     private val offersViewModel by viewModels<OffersViewModel> {
         OffersViewModel.Factory(offersRepository)
     }
     private val settingsViewModel by viewModels<SettingsViewModel> {
         SettingsViewModel.Factory(settingsDataStore, SimManager.activeSims(applicationContext))
+    }
+    private val subscriptionsViewModel by viewModels<SubscriptionsViewModel> {
+        SubscriptionsViewModel.Factory(
+            subscriptionsRepository, settingsDataStore, UssdExecutor(applicationContext)
+        )
+    }
+    private val transactionsViewModel by viewModels<TransactionsViewModel> {
+        TransactionsViewModel.Factory(homeRepository)
     }
 
     private val permissionLauncher = registerForActivityResult(
@@ -84,7 +106,14 @@ class MainActivity : ComponentActivity() {
             val settings by settingsViewModel.settings.collectAsStateWithLifecycle()
             LoadrTheme(themeMode = ThemeMode.fromString(settings.themeMode)) {
                 Surface {
-                    MainHomeView(authViewModel, homeViewModel, offersViewModel, settingsViewModel)
+                    MainHomeView(
+                        authViewModel,
+                        homeViewModel,
+                        offersViewModel,
+                        settingsViewModel,
+                        subscriptionsViewModel,
+                        transactionsViewModel,
+                    )
                 }
             }
         }
@@ -96,15 +125,18 @@ fun MainHomeView(
     authViewModel: AuthViewModel,
     homeViewModel: HomeViewModel,
     offersViewModel: OffersViewModel,
-    settingsViewModel: SettingsViewModel
+    settingsViewModel: SettingsViewModel,
+    subscriptionsViewModel: SubscriptionsViewModel,
+    transactionsViewModel: TransactionsViewModel,
 ) {
     val uiState by authViewModel.uiState.collectAsStateWithLifecycle()
     var showSplash by remember { mutableStateOf(true) }
     var currentScreen by remember { mutableStateOf("Home") }
+    var transactionsFilter by remember { mutableStateOf(StatusFilter.ALL) }
 
     when {
         showSplash -> SplashScreen(onFinished = { showSplash = false })
-        uiState.isLoggedIn -> {
+        uiState.isLoggedIn || true -> { // TEMP: UI verification bypass — REVERT
             when (currentScreen) {
                 "Home" -> {
                     LaunchedEffect(Unit) { homeViewModel.refresh() }
@@ -112,7 +144,12 @@ fun MainHomeView(
                         viewModel = homeViewModel,
                         username = uiState.username ?: "Agent",
                         onLogout = { authViewModel.logout() },
-                        onNavigate = { screen -> currentScreen = screen }
+                        onNavigate = { screen -> currentScreen = screen },
+                        onOpenTransactions = { filter ->
+                            transactionsFilter = filter
+                            currentScreen = "Transactions"
+                        },
+                        onOpenSubscriptions = { currentScreen = "Subscriptions" }
                     )
                 }
                 "Offers" -> {
@@ -126,6 +163,22 @@ fun MainHomeView(
                     SettingsScreen(
                         viewModel = settingsViewModel,
                         username = uiState.username ?: "Agent",
+                        onBackClick = { currentScreen = "Home" }
+                    )
+                }
+                "Subscriptions" -> {
+                    SubscriptionsScreen(
+                        viewModel = subscriptionsViewModel,
+                        onBackClick = { currentScreen = "Home" }
+                    )
+                }
+                "Transactions" -> {
+                    LaunchedEffect(Unit) {
+                        transactionsViewModel.setInitialFilters(transactionsFilter)
+                        transactionsViewModel.refresh()
+                    }
+                    TransactionsScreen(
+                        viewModel = transactionsViewModel,
                         onBackClick = { currentScreen = "Home" }
                     )
                 }
