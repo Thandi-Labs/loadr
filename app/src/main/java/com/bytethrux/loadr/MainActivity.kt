@@ -61,7 +61,11 @@ class MainActivity : ComponentActivity() {
     }
     private val homeViewModel by viewModels<HomeViewModel> {
         HomeViewModel.Factory(
-            homeRepository, airtimeBalanceProvider, subscriptionStore, subscriptionsRepository
+            homeRepository,
+            airtimeBalanceProvider,
+            subscriptionStore,
+            subscriptionsRepository,
+            settingsDataStore,
         )
     }
     private val offersViewModel by viewModels<OffersViewModel> {

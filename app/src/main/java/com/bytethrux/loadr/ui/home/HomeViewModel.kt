@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.bytethrux.loadr.data.network.HomeStatsDto
 import com.bytethrux.loadr.data.network.TransactionDto
+import com.bytethrux.loadr.data.local.SettingsDataStore
 import com.bytethrux.loadr.data.local.SubscriptionStore
 import com.bytethrux.loadr.data.repository.HomeRepository
 import com.bytethrux.loadr.data.repository.HomeResult
@@ -19,6 +20,7 @@ data class HomeUiState(
     val transactions: List<TransactionDto> = emptyList(),
     val errorMessage: String? = null,
     val isAirtimeRefreshing: Boolean = false,
+    val hideAirtime: Boolean = false,
 )
 
 class HomeViewModel(
@@ -26,12 +28,31 @@ class HomeViewModel(
     private val airtimeBalanceProvider: AirtimeBalanceProvider? = null,
     private val subscriptionStore: SubscriptionStore? = null,
     private val subscriptionsRepository: SubscriptionsRepository? = null,
+    private val settingsDataStore: SettingsDataStore? = null,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
-    init { refresh() }
+    init {
+        refresh()
+        if (settingsDataStore != null) {
+            viewModelScope.launch {
+                settingsDataStore.settings.collect { settings ->
+                    _uiState.update { it.copy(hideAirtime = settings.hideAirtime) }
+                }
+            }
+        }
+    }
+
+    /** Masks/unmasks the airtime figures on the dashboard; persisted. */
+    fun toggleHideAirtime() {
+        val newValue = !_uiState.value.hideAirtime
+        _uiState.update { it.copy(hideAirtime = newValue) }
+        if (settingsDataStore != null) {
+            viewModelScope.launch { settingsDataStore.setHideAirtime(newValue) }
+        }
+    }
 
     fun refresh() {
         viewModelScope.launch {
@@ -97,11 +118,16 @@ class HomeViewModel(
         private val airtimeBalanceProvider: AirtimeBalanceProvider? = null,
         private val subscriptionStore: SubscriptionStore? = null,
         private val subscriptionsRepository: SubscriptionsRepository? = null,
+        private val settingsDataStore: SettingsDataStore? = null,
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>) =
             HomeViewModel(
-                repository, airtimeBalanceProvider, subscriptionStore, subscriptionsRepository
+                repository,
+                airtimeBalanceProvider,
+                subscriptionStore,
+                subscriptionsRepository,
+                settingsDataStore,
             ) as T
     }
 }

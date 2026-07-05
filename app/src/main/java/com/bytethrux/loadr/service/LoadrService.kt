@@ -15,13 +15,10 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.bytethrux.loadr.MainActivity
 import com.bytethrux.loadr.R
-import com.bytethrux.loadr.data.local.ProcessingMode
 import com.bytethrux.loadr.data.local.SettingsDataStore
 import com.bytethrux.loadr.data.local.SubscriptionStore
 import com.bytethrux.loadr.data.local.TokenDataStore
-import com.bytethrux.loadr.data.network.CreateTransactionRequest
 import com.bytethrux.loadr.data.network.RetrofitClient
-import com.bytethrux.loadr.data.offers.OfferMatcher
 import com.bytethrux.loadr.data.repository.SubscriptionsRepository
 import com.bytethrux.loadr.data.sim.SimManager
 import com.bytethrux.loadr.data.ussd.UssdExecutor
@@ -32,9 +29,6 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import java.util.concurrent.atomic.AtomicInteger
 
 class LoadrService : Service() {
@@ -122,24 +116,6 @@ class LoadrService : Service() {
 
     private suspend fun processPayment(amount: Double, phone: String, customerName: String) {
         val statusId = nextStatusNotificationId.getAndIncrement()
-
-        // Without an active subscription with requests remaining the app must
-        // not process payments. The entitlement is synced from the backend;
-        // when offline the cached copy is used.
-        val subscriptionStore = SubscriptionStore(applicationContext)
-        val entitlement = SubscriptionsRepository(
-            RetrofitClient.instance,
-            TokenDataStore(applicationContext),
-            subscriptionStore,
-        ).syncMySubscription()
-        if (!entitlement.hasCapability()) {
-            notify(
-                statusId,
-                "Loadr - No active subscription or tokens. Ksh${amount.toLong()} from $phone was not processed."
-            )
-            return
-        }
-
         val settings = SettingsDataStore(applicationContext).settings.first()
 
         if (settings.autoSaveContacts) {
@@ -148,70 +124,51 @@ class LoadrService : Service() {
             )
         }
 
-        val token = TokenDataStore(applicationContext).accessToken.first()
-        if (token == null) {
-            notify(statusId, "Loadr - Not signed in, skipped payment from $phone")
-            return
-        }
-        val bearer = "Bearer $token"
-        val api = RetrofitClient.instance
-
-        val offers = try {
-            api.getOffers(bearer)
-        } catch (e: Exception) {
-            notify(statusId, "Loadr - Could not load offers (${e.message})")
-            return
-        }
-
-        val offer = OfferMatcher.match(offers, amount)
-        if (offer == null) {
-            notify(statusId, "Loadr - No active offer found for Ksh${amount.toLong()} from $phone")
-            return
-        }
-
-        val ussdCode = OfferMatcher.buildUssd(offer, phone)
-        notify(statusId, "Loadr - Sending ${offer.offer_name} to $phone…")
-
-        val result = UssdExecutor(applicationContext).run(
-            code = ussdCode,
-            simSlot = settings.bingwaSimSlot,
-            multiStep = settings.processingMode == ProcessingMode.ADVANCED,
+        val tokenDataStore = TokenDataStore(applicationContext)
+        val subscriptionStore = SubscriptionStore(applicationContext)
+        val processor = PaymentProcessor(
+            api = RetrofitClient.instance,
+            tokenDataStore = tokenDataStore,
+            subscriptionStore = subscriptionStore,
+            subscriptionsRepository = SubscriptionsRepository(
+                RetrofitClient.instance, tokenDataStore, subscriptionStore
+            ),
+            ussdExecutor = UssdExecutor(applicationContext),
         )
-        // Each executed USSD uses up one request locally; the backend count
-        // is authoritative and overwrites this on the next sync.
-        subscriptionStore.consumeToken()
-        val status = if (result.success) "success" else "failed"
 
-        try {
-            api.createTransaction(
-                bearer,
-                CreateTransactionRequest(
-                    offer_id = offer.id,
-                    customer_name = customerName,
-                    customer_phone = phone,
-                    amount = amount.toInt(),
-                    status = status,
-                    created_at = todayDate(),
-                )
-            )
-        } catch (_: Exception) {
-            // Log failure silently; USSD may have already executed
-        }
-
-        if (result.success && settings.engageBot) {
-            sendAutoReply(
-                phone = phone,
-                name = customerName,
-                offerName = offer.offer_name,
-                simSlot = settings.autoReplySimSlot,
-            )
-        }
-
-        notify(
-            statusId,
-            if (result.success) "Loadr - Sent ${offer.offer_name} to $phone"
-            else "Loadr - USSD failed for ${offer.offer_name} → $phone"
+        val outcome = processor.process(
+            amount = amount,
+            phone = phone,
+            customerName = customerName,
+            settings = settings,
+            onSending = { offerName -> notify(statusId, "Loadr - Sending $offerName to $phone…") },
         )
+
+        when (outcome) {
+            is PaymentProcessor.Outcome.NoEntitlement -> notify(
+                statusId,
+                "Loadr - No active subscription or tokens. Ksh${amount.toLong()} from $phone was not processed."
+            )
+            is PaymentProcessor.Outcome.NotSignedIn ->
+                notify(statusId, "Loadr - Not signed in, skipped payment from $phone")
+            is PaymentProcessor.Outcome.OffersUnavailable ->
+                notify(statusId, "Loadr - Could not load offers (${outcome.reason})")
+            is PaymentProcessor.Outcome.NoMatchingOffer ->
+                notify(statusId, "Loadr - No active offer found for Ksh${amount.toLong()} from $phone")
+            is PaymentProcessor.Outcome.Sent -> {
+                if (settings.engageBot) {
+                    sendAutoReply(
+                        phone = phone,
+                        name = customerName,
+                        offerName = outcome.offer.offer_name,
+                        simSlot = settings.autoReplySimSlot,
+                    )
+                }
+                notify(statusId, "Loadr - Sent ${outcome.offer.offer_name} to $phone")
+            }
+            is PaymentProcessor.Outcome.UssdFailed ->
+                notify(statusId, "Loadr - USSD failed for ${outcome.offer.offer_name} → $phone")
+        }
     }
 
     private fun sendAutoReply(phone: String, name: String, offerName: String, simSlot: Int) {
@@ -238,9 +195,6 @@ class LoadrService : Service() {
             // Auto-replies are best-effort.
         }
     }
-
-    private fun todayDate(): String =
-        SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
 
     private fun notify(id: Int, message: String) {
         (getSystemService(NOTIFICATION_SERVICE) as NotificationManager)

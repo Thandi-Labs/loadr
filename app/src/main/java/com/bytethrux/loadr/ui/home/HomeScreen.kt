@@ -23,6 +23,8 @@ import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Reply
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Storefront
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -114,7 +116,9 @@ fun HomeScreen(
                             AirtimeRow(
                                 stats = stats,
                                 isRefreshing = uiState.isAirtimeRefreshing,
+                                hidden = uiState.hideAirtime,
                                 onRefreshBalance = { viewModel.refreshAirtimeBalance() },
+                                onToggleHidden = { viewModel.toggleHideAirtime() },
                             )
                         }
                     }
@@ -275,21 +279,58 @@ private fun StatCard(
 private fun AirtimeRow(
     stats: HomeStatsDto,
     isRefreshing: Boolean,
+    hidden: Boolean,
     onRefreshBalance: () -> Unit,
+    onToggleHidden: () -> Unit,
 ) {
+    fun mask(amount: Double) = if (hidden) "Ksh ••••••" else "Ksh %.2f".format(amount)
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        AirtimeCard("Airtime used today", "Ksh %.2f".format(stats.airtime_used), Modifier.weight(1f))
+        AirtimeCard(
+            label = "Airtime used today",
+            value = mask(stats.airtime_used),
+            modifier = Modifier.weight(1f),
+            trailing = {
+                IconButton(onClick = onToggleHidden, modifier = Modifier.size(28.dp)) {
+                    Icon(
+                        imageVector = if (hidden)
+                            androidx.compose.material.icons.Icons.Outlined.VisibilityOff
+                        else
+                            androidx.compose.material.icons.Icons.Outlined.Visibility,
+                        contentDescription = if (hidden) "Show airtime figures" else "Hide airtime figures",
+                        tint = LoadrSlate,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        )
         AirtimeCard(
             label = "Airtime balance",
-            value = "Ksh %.2f".format(stats.airtime_balance),
+            value = mask(stats.airtime_balance),
             modifier = Modifier.weight(1f),
-            isRefreshing = isRefreshing,
-            onRefresh = onRefreshBalance,
+            trailing = {
+                if (isRefreshing) {
+                    CircularProgressIndicator(
+                        color = LoadrGreen,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(18.dp)
+                    )
+                } else {
+                    IconButton(onClick = onRefreshBalance, modifier = Modifier.size(28.dp)) {
+                        Icon(
+                            imageVector = androidx.compose.material.icons.Icons.Outlined.Refresh,
+                            contentDescription = "Refresh airtime balance",
+                            tint = LoadrGreen,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            }
         )
     }
 }
@@ -299,8 +340,7 @@ private fun AirtimeCard(
     label: String,
     value: String,
     modifier: Modifier = Modifier,
-    isRefreshing: Boolean = false,
-    onRefresh: (() -> Unit)? = null,
+    trailing: (@Composable () -> Unit)? = null,
 ) {
     Row(
         modifier = modifier
@@ -316,24 +356,7 @@ private fun AirtimeCard(
             Text(label.uppercase(), fontSize = 9.sp, color = LoadrSlate, letterSpacing = 0.4.sp)
             Text(value, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = LoadrWhite)
         }
-        if (onRefresh != null) {
-            if (isRefreshing) {
-                CircularProgressIndicator(
-                    color = LoadrGreen,
-                    strokeWidth = 2.dp,
-                    modifier = Modifier.size(18.dp)
-                )
-            } else {
-                IconButton(onClick = onRefresh, modifier = Modifier.size(28.dp)) {
-                    Icon(
-                        imageVector = androidx.compose.material.icons.Icons.Outlined.Refresh,
-                        contentDescription = "Refresh airtime balance",
-                        tint = LoadrGreen,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-            }
-        }
+        trailing?.invoke()
     }
 }
 

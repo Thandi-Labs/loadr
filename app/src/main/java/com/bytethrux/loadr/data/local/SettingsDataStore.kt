@@ -43,6 +43,8 @@ data class LoadrSettings(
     val processingMode: ProcessingMode = ProcessingMode.EXPRESS,
     // Appearance: "system" | "light" | "dark"
     val themeMode: String = "dark",
+    // Mask the airtime figures on the dashboard
+    val hideAirtime: Boolean = false,
 )
 
 class SettingsDataStore(private val context: Context) {
@@ -64,6 +66,7 @@ class SettingsDataStore(private val context: Context) {
         private val ENGAGE_BOT = booleanPreferencesKey("engage_bot")
         private val PROCESSING_MODE = stringPreferencesKey("processing_mode")
         private val THEME_MODE = stringPreferencesKey("theme_mode")
+        private val HIDE_AIRTIME = booleanPreferencesKey("hide_airtime")
 
         // Airtime balance cache (fetched via *144# USSD)
         private val AIRTIME_BALANCE = doublePreferencesKey("airtime_balance")
@@ -88,6 +91,7 @@ class SettingsDataStore(private val context: Context) {
             engageBot = prefs[ENGAGE_BOT] ?: true,
             processingMode = ProcessingMode.fromString(prefs[PROCESSING_MODE]),
             themeMode = prefs[THEME_MODE] ?: "dark",
+            hideAirtime = prefs[HIDE_AIRTIME] ?: false,
         )
     }
 
@@ -110,6 +114,7 @@ class SettingsDataStore(private val context: Context) {
     suspend fun setEngageBot(value: Boolean) = edit { it[ENGAGE_BOT] = value }
     suspend fun setProcessingMode(value: ProcessingMode) = edit { it[PROCESSING_MODE] = value.name.lowercase() }
     suspend fun setThemeMode(value: String) = edit { it[THEME_MODE] = value }
+    suspend fun setHideAirtime(value: Boolean) = edit { it[HIDE_AIRTIME] = value }
 
     suspend fun saveAirtimeBalance(balance: Double) = edit {
         it[AIRTIME_BALANCE] = balance
