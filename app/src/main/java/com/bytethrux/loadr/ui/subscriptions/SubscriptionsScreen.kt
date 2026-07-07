@@ -197,14 +197,6 @@ fun SubscriptionsScreen(
                 )
             }
 
-            Text(
-                "BingwaHybrid Subscription",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                color = LoadrWhite,
-                modifier = Modifier.padding(top = 4.dp)
-            )
-
             when {
                 uiState.isLoadingPlans -> Box(
                     modifier = Modifier

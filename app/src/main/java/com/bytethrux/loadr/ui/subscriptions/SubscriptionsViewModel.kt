@@ -38,7 +38,7 @@ class SubscriptionsViewModel(
 ) : ViewModel() {
 
     companion object {
-        // Activation payments go to this Bingwa till line: *140*<amount>*<line>#
+        // Activation payments go to this Loadr till line: *140*<amount>*<line>#
         const val ACTIVATION_LINE = "0768585724"
 
         fun activationCode(plan: SubscriptionPlanDto): String =
