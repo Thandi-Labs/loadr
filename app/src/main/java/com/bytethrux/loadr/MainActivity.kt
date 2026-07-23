@@ -52,6 +52,7 @@ class MainActivity : ComponentActivity() {
     private val offersRepository by lazy { OffersRepository(RetrofitClient.instance, tokenDataStore) }
     private val airtimeBalanceProvider by lazy { AirtimeBalanceProvider(applicationContext) }
     private val subscriptionStore by lazy { SubscriptionStore(applicationContext) }
+    private val simManager by lazy { SimManager(applicationContext) }
     private val subscriptionsRepository by lazy {
         SubscriptionsRepository(RetrofitClient.instance, tokenDataStore, subscriptionStore)
     }
@@ -72,7 +73,7 @@ class MainActivity : ComponentActivity() {
         OffersViewModel.Factory(offersRepository)
     }
     private val settingsViewModel by viewModels<SettingsViewModel> {
-        SettingsViewModel.Factory(settingsDataStore, SimManager.activeSims(applicationContext))
+        SettingsViewModel.Factory(settingsDataStore, simManager.activeSims())
     }
     private val subscriptionsViewModel by viewModels<SubscriptionsViewModel> {
         SubscriptionsViewModel.Factory(
@@ -101,6 +102,9 @@ class MainActivity : ComponentActivity() {
             Manifest.permission.READ_CONTACTS,
             Manifest.permission.WRITE_CONTACTS,
         )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            permissions += Manifest.permission.READ_PHONE_NUMBERS
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             permissions += Manifest.permission.POST_NOTIFICATIONS
         }

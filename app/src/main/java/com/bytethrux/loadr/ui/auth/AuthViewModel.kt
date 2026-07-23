@@ -49,7 +49,6 @@ class AuthViewModel(private val repository: AuthRepository) : ViewModel() {
 
             when (val result = repository.login(username, password)) {
                 is AuthResult.Success -> {
-//                    _uiState.update { it.copy(isLoading = false, isLoggedIn = true) }
                     _uiState.update { it.copy(isLoading = false, isLoggedIn = true, username = username) }
                 }
                 is AuthResult.Error -> {

@@ -25,12 +25,12 @@ class MpesaSmsReceiver : BroadcastReceiver() {
         val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
         val sender = messages.firstOrNull()?.originatingAddress ?: return
         val body = messages.joinToString("") { it.messageBody }
-        val receivedOnSlot = extractSlotIndex(context, intent)
+        val subId = extractSubscriptionId(intent)
 
         val pendingResult = goAsync()
         scope.launch {
             try {
-                handleSms(context, sender, body, receivedOnSlot)
+                handleSms(context, sender, body, subId)
             } finally {
                 pendingResult.finish()
             }
@@ -41,15 +41,29 @@ class MpesaSmsReceiver : BroadcastReceiver() {
         context: Context,
         sender: String,
         body: String,
-        receivedOnSlot: Int,
+        receivedOnSubId: Int,
     ) {
         val settings = SettingsDataStore(context).settings.first()
 
+        // Pause automation if SIM configuration is out of sync.
+        if (settings.simsNeedAttention) return
+
         if (!isMpesaSender(sender) && !isAuthorizedSender(sender, settings)) return
 
-        // Only act on payments arriving on the SIM chosen to receive them
-        // (when the slot could not be determined, process anyway).
-        if (receivedOnSlot != -1 && receivedOnSlot != settings.paymentSimSlot) return
+        // Only act on payments arriving on the SIM chosen to receive them.
+        // Match by subscriptionId (identity) first, falling back to slot.
+        val isCorrectSim = when {
+            settings.paymentSubId != -1 -> receivedOnSubId == settings.paymentSubId
+            receivedOnSubId != -1 -> {
+                val slot = SimManager(context).activeSims()
+                    .firstOrNull { it.subscriptionId == receivedOnSubId }
+                    ?.slotIndex
+                slot == settings.paymentSimSlot
+            }
+            else -> true // Can't determine, process anyway to avoid missing payments
+        }
+
+        if (!isCorrectSim) return
 
         val payment = MpesaParser.parse(body) ?: return
 
@@ -80,23 +94,12 @@ class MpesaSmsReceiver : BroadcastReceiver() {
     private fun isAuthorizedSender(sender: String, settings: LoadrSettings): Boolean =
         settings.authorizedSenders.any { it.equals(sender, ignoreCase = true) }
 
-    /** Which SIM slot the SMS arrived on; -1 when it can't be determined. */
-    private fun extractSlotIndex(context: Context, intent: Intent): Int {
+    /** Which subscription the SMS arrived on; -1 when it can't be determined. */
+    private fun extractSubscriptionId(intent: Intent): Int {
         val extras = intent.extras ?: return -1
-
-        val slot = extras.getInt("android.telephony.extra.SLOT_INDEX", -1)
-            .takeIf { it != -1 }
-            ?: extras.getInt("slot", -1).takeIf { it != -1 }
-            ?: extras.getInt("phone", -1).takeIf { it != -1 }
-        if (slot != null) return slot
-
-        // Fall back to mapping the subscription id to its slot.
-        val subId = extras.getInt("android.telephony.extra.SUBSCRIPTION_INDEX", -1)
+        return extras.getInt("android.telephony.extra.SUBSCRIPTION_INDEX", -1)
             .takeIf { it != -1 }
             ?: extras.getInt("subscription", -1).takeIf { it != -1 }
-            ?: return -1
-        return SimManager.activeSims(context)
-            .firstOrNull { it.subscriptionId == subId }
-            ?.slotIndex ?: -1
+            ?: -1
     }
 }

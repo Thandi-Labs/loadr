@@ -34,6 +34,7 @@ import java.util.concurrent.atomic.AtomicInteger
 class LoadrService : Service() {
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val simManager by lazy { SimManager(applicationContext) }
 
     // Payments are accepted concurrently and queued; a single worker executes
     // them in arrival order because the modem runs one USSD session at a time.
@@ -188,7 +189,7 @@ class LoadrService : Service() {
             "Hi ${name.split(" ").first().lowercase().replaceFirstChar { it.uppercase() }}, " +
                 "your $offerName has been processed. Thank you for your purchase!"
         try {
-            val subId = SimManager.subscriptionIdForSlot(applicationContext, simSlot)
+            val subId = simManager.subscriptionIdForSlot(simSlot)
             val smsManager = when {
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
                     val base = getSystemService(SmsManager::class.java)
