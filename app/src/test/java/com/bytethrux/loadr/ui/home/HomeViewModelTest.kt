@@ -182,14 +182,16 @@ class HomeViewModelTest {
     }
 
     @Test
-    fun `refresh with stats error propagates errorMessage`() = runTest {
+    fun `refresh with stats error propagates errorMessage but keeps stats for robustness`() = runTest {
         coEvery { repository.getStats() } returns HomeResult.Error("Stats unavailable")
 
         viewModel.refresh()
         advanceUntilIdle()
 
         assertEquals("Stats unavailable", viewModel.uiState.value.errorMessage)
-        assertNull(viewModel.uiState.value.stats)
+        // stats should NOT be null; it falls back to default/computed tallies
+        // so the dashboard cards don't disappear.
+        assertNotNull(viewModel.uiState.value.stats)
     }
 
     @Test
