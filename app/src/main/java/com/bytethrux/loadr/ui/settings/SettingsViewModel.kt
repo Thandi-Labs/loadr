@@ -27,13 +27,34 @@ class SettingsViewModel(
     fun setProcessSiteLink(value: Boolean) = save { setProcessSiteLink(value) }
     fun setAutoSaveContacts(value: Boolean) = save { setAutoSaveContacts(value) }
     fun setContactNameSuffix(value: String) = save { setContactNameSuffix(value) }
-    fun setPaymentSimSlot(value: Int) = save { setPaymentSimSlot(value) }
-    fun setBingwaSimSlot(value: Int) = save { setBingwaSimSlot(value) }
-    fun setAutoReplySimSlot(value: Int) = save { setAutoReplySimSlot(value) }
+    fun setPaymentSimSlot(value: Int) {
+        val subId = availableSims.firstOrNull { it.slotIndex == value }?.subscriptionId ?: -1
+        save {
+            setPaymentSimSlot(value, subId)
+            setSimsNeedAttention(false)
+        }
+    }
+
+    fun setBingwaSimSlot(value: Int) {
+        val subId = availableSims.firstOrNull { it.slotIndex == value }?.subscriptionId ?: -1
+        save {
+            setBingwaSimSlot(value, subId)
+            setSimsNeedAttention(false)
+        }
+    }
+
+    fun setAutoReplySimSlot(value: Int) {
+        val subId = availableSims.firstOrNull { it.slotIndex == value }?.subscriptionId ?: -1
+        save {
+            setAutoReplySimSlot(value, subId)
+            setSimsNeedAttention(false)
+        }
+    }
     fun setHybridPortal(value: Boolean) = save { setHybridPortal(value) }
     fun setEngageBot(value: Boolean) = save { setEngageBot(value) }
     fun setProcessingMode(value: ProcessingMode) = save { setProcessingMode(value) }
     fun setThemeMode(value: String) = save { setThemeMode(value) }
+    fun setAutoRemapSims(value: Boolean) = save { setAutoRemapSims(value) }
 
     fun addAuthorizedSender(sender: String) {
         val trimmed = sender.trim()

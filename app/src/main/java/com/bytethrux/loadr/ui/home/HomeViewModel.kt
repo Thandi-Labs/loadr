@@ -23,6 +23,7 @@ data class HomeUiState(
     val errorMessage: String? = null,
     val isAirtimeRefreshing: Boolean = false,
     val hideAirtime: Boolean = false,
+    val simsNeedAttention: Boolean = false,
 )
 
 class HomeViewModel(
@@ -41,7 +42,10 @@ class HomeViewModel(
         if (settingsDataStore != null) {
             viewModelScope.launch {
                 settingsDataStore.settings.collect { settings ->
-                    _uiState.update { it.copy(hideAirtime = settings.hideAirtime) }
+                    _uiState.update { it.copy(
+                        hideAirtime = settings.hideAirtime,
+                        simsNeedAttention = settings.simsNeedAttention
+                    ) }
                 }
             }
         }
@@ -73,11 +77,21 @@ class HomeViewModel(
             val statsResult = repository.getStats()
             val txResult = repository.getRecentTransactions()
             val transactions = (txResult as? HomeResult.Success)?.data ?: emptyList()
-            var stats = (statsResult as? HomeResult.Success)?.data
+            val settings = settingsDataStore?.settings?.first()
+            
+            var stats = (statsResult as? HomeResult.Success)?.data ?: HomeStatsDto(
+                successful_today = 0,
+                failed_today = 0,
+                token_balance = 0,
+                airtime_used = 0.0,
+                airtime_balance = 0.0,
+                weekly_commission = 0.0,
+                commission_by_day = List(7) { 0.0 }
+            )
 
             // Today's tallies come from the actual transactions: counts for
             // the Successful/Failed cards and the airtime spent.
-            stats = stats?.copy(
+            stats = stats.copy(
                 successful_today = TransactionFilters.countToday(transactions, StatusFilter.SUCCESSFUL),
                 failed_today = TransactionFilters.countToday(transactions, StatusFilter.FAILED),
                 airtime_used = TransactionFilters.airtimeUsedToday(transactions),
@@ -87,16 +101,16 @@ class HomeViewModel(
             // from the backend stats. Show the last known value immediately…
             if (airtimeBalanceProvider != null) {
                 val cached = airtimeBalanceProvider.cachedBalance()
-                stats = stats?.copy(airtime_balance = cached ?: 0.0)
+                stats = stats.copy(airtime_balance = cached ?: 0.0)
             }
             // Tokens: the exact remainder while subscribed (each USSD
             // subtracts one), zero when the subscription has lapsed.
             if (subscriptionsRepository != null) {
-                stats = stats?.copy(
+                stats = stats.copy(
                     token_balance = subscriptionsRepository.syncMySubscription().availableTokens()
                 )
             } else if (subscriptionStore != null) {
-                stats = stats?.copy(token_balance = subscriptionStore.current().availableTokens())
+                stats = stats.copy(token_balance = subscriptionStore.current().availableTokens())
             }
             _uiState.update {
                 it.copy(
@@ -107,8 +121,8 @@ class HomeViewModel(
                 )
             }
 
-            // …then run the *144# USSD for a fresh reading.
-            if (airtimeBalanceProvider != null && stats != null) {
+            // …then run the *144# USSD for a fresh reading, unless SIMs need attention.
+            if (airtimeBalanceProvider != null && settings?.simsNeedAttention != true) {
                 val balance = airtimeBalanceProvider.refreshBalance()
                 if (balance != null) {
                     _uiState.update { state ->

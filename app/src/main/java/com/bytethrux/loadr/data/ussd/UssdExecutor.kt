@@ -16,6 +16,8 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
+import kotlin.time.Duration.Companion.milliseconds
+import androidx.core.net.toUri
 
 data class UssdResult(
     val success: Boolean,
@@ -30,10 +32,14 @@ data class UssdResult(
  * Multi-step ("advanced") codes are written as steps separated by ";" or
  * newlines — each step is dispatched as its own USSD request, in order.
  */
-class UssdExecutor(private val context: Context) {
+class UssdExecutor(
+    private val context: Context,
+    private val simManager: SimManager = SimManager(context)
+) {
 
     companion object {
         const val BALANCE_CODE = "*144#"
+        const val BONGA_CODE = "*126#;1"
         private const val USSD_TIMEOUT_MS = 35_000L
         private const val STEP_DELAY_MS = 2_000L
 
@@ -57,6 +63,11 @@ class UssdExecutor(private val context: Context) {
             Regex("""Kshs?\.?\s*([\d,]+(?:\.\d{1,2})?)""", RegexOption.IGNORE_CASE),
             // Amount before the currency: "5.10 KSH"
             Regex("""([\d,]+(?:\.\d{1,2})?)\s*Kshs?""", RegexOption.IGNORE_CASE),
+            // Bonga points: "You have 1,234 Bonga Points"
+            Regex(
+                """(?:have|points)\s*:?\s*([\d,]+(?:\.\d{1,2})?)\s*Bonga""",
+                RegexOption.IGNORE_CASE
+            ),
         )
 
         fun parseBalance(response: String?): Double? {
@@ -113,11 +124,11 @@ class UssdExecutor(private val context: Context) {
     @RequiresApi(Build.VERSION_CODES.O)
     private suspend fun ussdApi26(code: String, simSlot: Int): UssdResult {
         val default = context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
-        val subId = SimManager.subscriptionIdForSlot(context, simSlot)
+        val subId = simManager.subscriptionIdForSlot(simSlot)
         val tm = if (subId != null) default.createForSubscriptionId(subId) else default
 
         return try {
-            withTimeoutOrNull(USSD_TIMEOUT_MS) {
+            withTimeoutOrNull(USSD_TIMEOUT_MS.milliseconds) {
                 suspendCancellableCoroutine { cont ->
                     tm.sendUssdRequest(
                         code,
@@ -145,7 +156,7 @@ class UssdExecutor(private val context: Context) {
 
     private fun dialIntent(code: String): Boolean {
         return try {
-            val uri = Uri.parse("tel:${Uri.encode(code)}")
+            val uri = "tel:${Uri.encode(code)}".toUri()
             context.startActivity(
                 Intent(Intent.ACTION_CALL, uri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             )
@@ -158,6 +169,13 @@ class UssdExecutor(private val context: Context) {
     /** Queries the SIM's airtime balance via [BALANCE_CODE]; null on failure. */
     suspend fun fetchAirtimeBalance(simSlot: Int): Double? {
         val result = ussdLock.withLock { runSingle(BALANCE_CODE, simSlot) }
+        if (!result.success) return null
+        return parseBalance(result.response)
+    }
+
+    /** Queries the SIM's Bonga balance via [BONGA_CODE]; null on failure. */
+    suspend fun fetchBongaBalance(simSlot: Int): Double? {
+        val result = run(BONGA_CODE, simSlot, multiStep = true)
         if (!result.success) return null
         return parseBalance(result.response)
     }
