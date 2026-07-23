@@ -1,7 +1,6 @@
 package com.bytethrux.loadr.ui.settings
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -49,10 +48,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -87,10 +83,7 @@ fun SettingsScreen(
 
     // At least two selectable slots even when SIM info is unavailable.
     val sims = viewModel.availableSims.ifEmpty {
-        listOf(
-            SimInfo(0, -1, "SIM 1", "SIM 1", "", false, -1),
-            SimInfo(1, -1, "SIM 2", "SIM 2", "", false, -1)
-        )
+        listOf(SimInfo(0, -1, "SIM 1"), SimInfo(1, -1, "SIM 2"))
     }
 
     Scaffold(
@@ -154,71 +147,43 @@ fun SettingsScreen(
 
             // ── Message Processing ────────────────────────
             SectionHeader("Message Processing")
-            SettingsCard(enabled = !settings.simsNeedAttention) {
-                ToggleRow("Process M-Pesa Messages", checked = settings.processMpesa, onChange = viewModel::setProcessMpesa, enabled = !settings.simsNeedAttention)
+            SettingsCard {
+                ToggleRow("Process M-Pesa Messages", checked = settings.processMpesa, onChange = viewModel::setProcessMpesa)
                 RowDivider()
-                ToggleRow("Process Till Messages", checked = settings.processTill, onChange = viewModel::setProcessTill, enabled = !settings.simsNeedAttention)
+                ToggleRow("Process Till Messages", checked = settings.processTill, onChange = viewModel::setProcessTill)
                 RowDivider()
-                ToggleRow("Process PayBill Messages", checked = settings.processPayBill, onChange = viewModel::setProcessPayBill, enabled = !settings.simsNeedAttention)
+                ToggleRow("Process PayBill Messages", checked = settings.processPayBill, onChange = viewModel::setProcessPayBill)
                 RowDivider()
-                ToggleRow("Process SiteLink Messages", checked = settings.processSiteLink, onChange = viewModel::setProcessSiteLink, enabled = !settings.simsNeedAttention)
+                ToggleRow("Process SiteLink Messages", checked = settings.processSiteLink, onChange = viewModel::setProcessSiteLink)
                 RowDivider()
                 NavRow(
                     title = "Authorized Senders",
                     subtitle = "Messages from these senders will be processed too",
-                    onClick = { showAuthorizedSenders = true },
-                    enabled = !settings.simsNeedAttention
+                    onClick = { showAuthorizedSenders = true }
                 )
             }
 
             // ── My Customers ──────────────────────────────
             SectionHeader("My Customers")
-            SettingsCard(enabled = !settings.simsNeedAttention) {
+            SettingsCard {
                 ToggleRow(
                     title = "Auto-Save Contacts",
                     subtitle = "Tap to configure the name suffix",
                     checked = settings.autoSaveContacts,
                     onChange = viewModel::setAutoSaveContacts,
-                    onRowClick = { showSuffixDialog = true },
-                    enabled = !settings.simsNeedAttention
+                    onRowClick = { showSuffixDialog = true }
                 )
                 RowDivider()
                 NavRow(
                     title = "BlackList",
                     subtitle = "Blacklisted customers will not be recommended offers",
-                    onClick = { showBlacklist = true },
-                    enabled = !settings.simsNeedAttention
+                    onClick = { showBlacklist = true }
                 )
             }
 
             // ── SIM Setup ─────────────────────────────────
             SectionHeader("SIM Setup")
-            SettingsCard(
-                borderColor = if (settings.simsNeedAttention) LoadrRed else Color.Transparent,
-                borderWidth = if (settings.simsNeedAttention) 2.dp else 0.dp
-            ) {
-                if (settings.simsNeedAttention) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(LoadrRed.copy(alpha = 0.1f))
-                            .padding(horizontal = 16.dp, vertical = 12.dp)
-                    ) {
-                        Text(
-                            "Please re-map your SIM slots to resume automation.",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = LoadrRed
-                        )
-                    }
-                }
-                ToggleRow(
-                    title = "Auto-Remap SIMs",
-                    subtitle = "Automatically update slots when cards are moved",
-                    checked = settings.autoRemapSims,
-                    onChange = viewModel::setAutoRemapSims
-                )
-                RowDivider()
+            SettingsCard {
                 SimGroup(
                     title = "SIM to receive payments",
                     sims = sims,
@@ -243,45 +208,41 @@ fun SettingsScreen(
 
             // ── Hybrid Portal ─────────────────────────────
             SectionHeader("Hybrid Portal")
-            SettingsCard(enabled = !settings.simsNeedAttention) {
+            SettingsCard {
                 ToggleRow(
                     title = "Hybrid Portal",
                     subtitle = "View and manage transactions remotely",
                     checked = settings.hybridPortal,
-                    onChange = viewModel::setHybridPortal,
-                    enabled = !settings.simsNeedAttention
+                    onChange = viewModel::setHybridPortal
                 )
             }
 
             // ── Customer Tools ────────────────────────────
             SectionHeader("Customer Tools")
-            SettingsCard(enabled = !settings.simsNeedAttention) {
+            SettingsCard {
                 ToggleRow(
                     title = "EngageBot",
                     subtitle = "Engage your customers on already recommended offers",
                     checked = settings.engageBot,
-                    onChange = viewModel::setEngageBot,
-                    enabled = !settings.simsNeedAttention
+                    onChange = viewModel::setEngageBot
                 )
             }
 
             // ── Processing Mode ───────────────────────────
             SectionHeader("Processing Mode")
-            SettingsCard(enabled = !settings.simsNeedAttention) {
+            SettingsCard {
                 RadioRow(
                     title = "Express Mode",
                     subtitle = "Processes USSDs that can be completed in one request",
                     selected = settings.processingMode == ProcessingMode.EXPRESS,
-                    onSelect = { viewModel.setProcessingMode(ProcessingMode.EXPRESS) },
-                    enabled = !settings.simsNeedAttention
+                    onSelect = { viewModel.setProcessingMode(ProcessingMode.EXPRESS) }
                 )
                 RowDivider()
                 RadioRow(
                     title = "Advanced Mode",
                     subtitle = "Processes USSDs that require multiple steps to complete",
                     selected = settings.processingMode == ProcessingMode.ADVANCED,
-                    onSelect = { viewModel.setProcessingMode(ProcessingMode.ADVANCED) },
-                    enabled = !settings.simsNeedAttention
+                    onSelect = { viewModel.setProcessingMode(ProcessingMode.ADVANCED) }
                 )
             }
 
@@ -381,19 +342,12 @@ private fun SectionHeader(title: String) {
 }
 
 @Composable
-private fun SettingsCard(
-    enabled: Boolean = true,
-    borderColor: Color = Color.Transparent,
-    borderWidth: Dp = 0.dp,
-    content: @Composable () -> Unit
-) {
+private fun SettingsCard(content: @Composable () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .alpha(if (enabled) 1f else 0.6f)
             .clip(RoundedCornerShape(14.dp))
             .background(LoadrNavyCard)
-            .then(if (borderWidth > 0.dp) Modifier.border(borderWidth, borderColor, RoundedCornerShape(14.dp)) else Modifier)
     ) {
         content()
     }
@@ -415,12 +369,11 @@ private fun ToggleRow(
     onChange: (Boolean) -> Unit,
     subtitle: String? = null,
     onRowClick: (() -> Unit)? = null,
-    enabled: Boolean = true,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .then(if (enabled && onRowClick != null) Modifier.clickable(onClick = onRowClick) else Modifier)
+            .then(if (onRowClick != null) Modifier.clickable(onClick = onRowClick) else Modifier)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -431,34 +384,31 @@ private fun ToggleRow(
                 Text(subtitle, fontSize = 11.sp, color = LoadrSlate)
             }
         }
-        LoadrSwitch(checked = checked, onChange = onChange, enabled = enabled)
+        LoadrSwitch(checked = checked, onChange = onChange)
     }
 }
 
 @Composable
-private fun LoadrSwitch(checked: Boolean, onChange: (Boolean) -> Unit, enabled: Boolean = true) {
+private fun LoadrSwitch(checked: Boolean, onChange: (Boolean) -> Unit) {
     Switch(
         checked = checked,
         onCheckedChange = onChange,
-        enabled = enabled,
         colors = SwitchDefaults.colors(
             checkedThumbColor = LoadrOnGreen,
             checkedTrackColor = LoadrGreen,
             uncheckedThumbColor = LoadrSlate,
             uncheckedTrackColor = LoadrNavySurface,
             uncheckedBorderColor = LoadrSlate,
-            disabledCheckedTrackColor = LoadrGreen.copy(alpha = 0.5f),
-            disabledUncheckedTrackColor = LoadrNavySurface.copy(alpha = 0.5f)
         )
     )
 }
 
 @Composable
-private fun NavRow(title: String, subtitle: String, onClick: () -> Unit, enabled: Boolean = true) {
+private fun NavRow(title: String, subtitle: String, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier)
+            .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -491,7 +441,6 @@ private fun SimGroup(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
         )
         sims.forEach { sim ->
-            val isSelected = sim.slotIndex == selectedSlot
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -503,22 +452,17 @@ private fun SimGroup(
                 Icon(
                     Icons.Outlined.SimCard,
                     contentDescription = null,
-                    tint = if (isSelected) LoadrGreen else LoadrSlate,
+                    tint = if (sim.slotIndex == selectedSlot) LoadrGreen else LoadrSlate,
                     modifier = Modifier.size(18.dp)
                 )
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Slot ${sim.slotIndex + 1}", fontSize = 13.sp, color = LoadrWhite)
-                    val detailText = if (sim.number.isNotBlank()) {
-                        sim.number
-                    } else if (sim.carrierName.isNotBlank() && sim.carrierName != "SIM ${sim.slotIndex + 1}") {
-                        sim.carrierName
-                    } else {
-                        "Unknown Number"
+                    Text("SIM ${sim.slotIndex + 1}", fontSize = 13.sp, color = LoadrWhite)
+                    if (sim.carrierName.isNotBlank() && sim.carrierName != "SIM ${sim.slotIndex + 1}") {
+                        Text(sim.carrierName, fontSize = 10.sp, color = LoadrSlate)
                     }
-                    Text(detailText, fontSize = 10.sp, color = if (isSelected) LoadrGreen else LoadrSlate)
                 }
                 LoadrSwitch(
-                    checked = isSelected,
+                    checked = sim.slotIndex == selectedSlot,
                     onChange = { if (it) onSelect(sim.slotIndex) }
                 )
             }
@@ -532,19 +476,17 @@ private fun RadioRow(
     subtitle: String,
     selected: Boolean,
     onSelect: () -> Unit,
-    enabled: Boolean = true,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .then(if (enabled) Modifier.clickable(onClick = onSelect) else Modifier)
+            .clickable(onClick = onSelect)
             .padding(horizontal = 8.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         RadioButton(
             selected = selected,
-            onClick = if (enabled) onSelect else null,
-            enabled = enabled,
+            onClick = onSelect,
             colors = RadioButtonDefaults.colors(
                 selectedColor = LoadrGreen,
                 unselectedColor = LoadrSlate

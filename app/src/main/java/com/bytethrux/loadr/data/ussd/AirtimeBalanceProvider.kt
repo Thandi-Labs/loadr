@@ -5,8 +5,8 @@ import com.bytethrux.loadr.data.local.SettingsDataStore
 import kotlinx.coroutines.flow.first
 
 /**
- * Supplies the real SIM balances (Airtime and Bonga) for the home screen.
- * The balances are fetched via USSD on the user's Bingwa SIM and cached in
+ * Supplies the real SIM airtime balance for the home screen. The balance is
+ * fetched via the *144# USSD on the user's Bingwa SIM and cached in
  * DataStore so the dashboard has an instant value between refreshes.
  */
 class AirtimeBalanceProvider(
@@ -20,57 +20,24 @@ class AirtimeBalanceProvider(
         private const val MIN_REFRESH_INTERVAL_MS = 60_000L
     }
 
-    /** Last cached balances. */
-    suspend fun cachedAirtime(): Double? = settingsDataStore.airtimeBalance.first()
-    suspend fun cachedBonga(): Double? = settingsDataStore.bongaBalance.first()
+    /** Last cached balance, or null if it was never fetched. */
+    suspend fun cachedBalance(): Double? = settingsDataStore.airtimeBalance.first()
 
     /**
-     * Returns a fresh airtime balance, running USSD when the cache is stale.
-     * Skips USSD if SIM configuration needs attention.
+     * Returns a fresh balance, running the *144# USSD when the cache is stale.
+     * Falls back to the cached value when the USSD fails (no SIM, permission
+     * denied, timeout).
      */
-    suspend fun refreshAirtime(force: Boolean = false): Double? {
-        val settings = settingsDataStore.settings.first()
+    suspend fun refreshBalance(force: Boolean = false): Double? {
         val cached = settingsDataStore.airtimeBalance.first()
         val cachedAt = settingsDataStore.airtimeBalanceAt.first() ?: 0L
-        
         val fresh = cached != null &&
             System.currentTimeMillis() - cachedAt < MIN_REFRESH_INTERVAL_MS
         if (fresh && !force) return cached
 
-        // Don't run USSD if the SIMs are out of sync or missing.
-        if (settings.simsNeedAttention) return cached
-
-        val simSlot = settings.bingwaSimSlot
+        val simSlot = settingsDataStore.settings.first().bingwaSimSlot
         val balance = ussdExecutor.fetchAirtimeBalance(simSlot) ?: return cached
         settingsDataStore.saveAirtimeBalance(balance)
         return balance
     }
-
-    /**
-     * Returns a fresh Bonga balance, running USSD when the cache is stale.
-     * Skips USSD if SIM configuration needs attention.
-     */
-    suspend fun refreshBonga(force: Boolean = false): Double? {
-        val settings = settingsDataStore.settings.first()
-        val cached = settingsDataStore.bongaBalance.first()
-        val cachedAt = settingsDataStore.bongaBalanceAt.first() ?: 0L
-        
-        val fresh = cached != null &&
-            System.currentTimeMillis() - cachedAt < MIN_REFRESH_INTERVAL_MS
-        if (fresh && !force) return cached
-
-        // Don't run USSD if the SIMs are out of sync or missing.
-        if (settings.simsNeedAttention) return cached
-
-        val simSlot = settings.bingwaSimSlot
-        val balance = ussdExecutor.fetchBongaBalance(simSlot) ?: return cached
-        settingsDataStore.saveBongaBalance(balance)
-        return balance
-    }
-
-    /** Helper for UI to get the cached value without waiting for USSD. */
-    suspend fun cachedBalance(): Double? = cachedAirtime()
-
-    /** Legacy method to maintain compatibility with existing callers. */
-    suspend fun refreshBalance(force: Boolean = false): Double? = refreshAirtime(force)
 }

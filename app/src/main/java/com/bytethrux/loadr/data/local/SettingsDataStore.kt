@@ -34,11 +34,8 @@ data class LoadrSettings(
     val blacklist: Set<String> = emptySet(),
     // SIM setup (slot indices: 0 = SIM 1, 1 = SIM 2)
     val paymentSimSlot: Int = 0,
-    val paymentSubId: Int = -1,
     val bingwaSimSlot: Int = 0,
-    val bingwaSubId: Int = -1,
     val autoReplySimSlot: Int = 0,
-    val autoReplySubId: Int = -1,
     // Hybrid portal & customer tools
     val hybridPortal: Boolean = false,
     val engageBot: Boolean = true,
@@ -48,9 +45,6 @@ data class LoadrSettings(
     val themeMode: String = "dark",
     // Mask the airtime figures on the dashboard
     val hideAirtime: Boolean = false,
-    // Whether the SIM configuration is out of sync or missing
-    val simsNeedAttention: Boolean = false,
-    val autoRemapSims: Boolean = false,
 )
 
 class SettingsDataStore(private val context: Context) {
@@ -66,26 +60,17 @@ class SettingsDataStore(private val context: Context) {
         private val CONTACT_NAME_SUFFIX = stringPreferencesKey("contact_name_suffix")
         private val BLACKLIST = stringSetPreferencesKey("blacklist")
         private val PAYMENT_SIM_SLOT = intPreferencesKey("payment_sim_slot")
-        private val PAYMENT_SUB_ID = intPreferencesKey("payment_sub_id")
         private val BINGWA_SIM_SLOT = intPreferencesKey("bingwa_sim_slot")
-        private val BINGWA_SUB_ID = intPreferencesKey("bingwa_sub_id")
         private val AUTOREPLY_SIM_SLOT = intPreferencesKey("autoreply_sim_slot")
-        private val AUTOREPLY_SUB_ID = intPreferencesKey("autoreply_sub_id")
         private val HYBRID_PORTAL = booleanPreferencesKey("hybrid_portal")
         private val ENGAGE_BOT = booleanPreferencesKey("engage_bot")
         private val PROCESSING_MODE = stringPreferencesKey("processing_mode")
         private val THEME_MODE = stringPreferencesKey("theme_mode")
         private val HIDE_AIRTIME = booleanPreferencesKey("hide_airtime")
-        private val SIMS_NEED_ATTENTION = booleanPreferencesKey("sims_need_attention")
-        private val AUTO_REMAP_SIMS = booleanPreferencesKey("auto_remap_sims")
 
         // Airtime balance cache (fetched via *144# USSD)
         private val AIRTIME_BALANCE = doublePreferencesKey("airtime_balance")
         private val AIRTIME_BALANCE_AT = longPreferencesKey("airtime_balance_at")
-
-        // Bonga point balance cache (fetched via *126# USSD)
-        private val BONGA_BALANCE = doublePreferencesKey("bonga_balance")
-        private val BONGA_BALANCE_AT = longPreferencesKey("bonga_balance_at")
     }
 
     val settings: Flow<LoadrSettings> = context.dataStore.data.map { prefs ->
@@ -100,26 +85,18 @@ class SettingsDataStore(private val context: Context) {
             contactNameSuffix = prefs[CONTACT_NAME_SUFFIX] ?: "Loadr",
             blacklist = prefs[BLACKLIST] ?: emptySet(),
             paymentSimSlot = prefs[PAYMENT_SIM_SLOT] ?: 0,
-            paymentSubId = prefs[PAYMENT_SUB_ID] ?: -1,
             bingwaSimSlot = prefs[BINGWA_SIM_SLOT] ?: 0,
-            bingwaSubId = prefs[BINGWA_SUB_ID] ?: -1,
             autoReplySimSlot = prefs[AUTOREPLY_SIM_SLOT] ?: 0,
-            autoReplySubId = prefs[AUTOREPLY_SUB_ID] ?: -1,
             hybridPortal = prefs[HYBRID_PORTAL] ?: false,
             engageBot = prefs[ENGAGE_BOT] ?: true,
             processingMode = ProcessingMode.fromString(prefs[PROCESSING_MODE]),
             themeMode = prefs[THEME_MODE] ?: "dark",
             hideAirtime = prefs[HIDE_AIRTIME] ?: false,
-            simsNeedAttention = prefs[SIMS_NEED_ATTENTION] ?: false,
-            autoRemapSims = prefs[AUTO_REMAP_SIMS] ?: false,
         )
     }
 
     val airtimeBalance: Flow<Double?> = context.dataStore.data.map { it[AIRTIME_BALANCE] }
     val airtimeBalanceAt: Flow<Long?> = context.dataStore.data.map { it[AIRTIME_BALANCE_AT] }
-
-    val bongaBalance: Flow<Double?> = context.dataStore.data.map { it[BONGA_BALANCE] }
-    val bongaBalanceAt: Flow<Long?> = context.dataStore.data.map { it[BONGA_BALANCE_AT] }
 
     suspend fun setDisplayName(value: String) = edit { it[DISPLAY_NAME] = value }
     suspend fun setProcessMpesa(value: Boolean) = edit { it[PROCESS_MPESA] = value }
@@ -130,34 +107,18 @@ class SettingsDataStore(private val context: Context) {
     suspend fun setAutoSaveContacts(value: Boolean) = edit { it[AUTO_SAVE_CONTACTS] = value }
     suspend fun setContactNameSuffix(value: String) = edit { it[CONTACT_NAME_SUFFIX] = value }
     suspend fun setBlacklist(value: Set<String>) = edit { it[BLACKLIST] = value }
-    suspend fun setPaymentSimSlot(value: Int, subId: Int = -1) = edit {
-        it[PAYMENT_SIM_SLOT] = value
-        if (subId != -1) it[PAYMENT_SUB_ID] = subId
-    }
-    suspend fun setBingwaSimSlot(value: Int, subId: Int = -1) = edit {
-        it[BINGWA_SIM_SLOT] = value
-        if (subId != -1) it[BINGWA_SUB_ID] = subId
-    }
-    suspend fun setAutoReplySimSlot(value: Int, subId: Int = -1) = edit {
-        it[AUTOREPLY_SIM_SLOT] = value
-        if (subId != -1) it[AUTOREPLY_SUB_ID] = subId
-    }
+    suspend fun setPaymentSimSlot(value: Int) = edit { it[PAYMENT_SIM_SLOT] = value }
+    suspend fun setBingwaSimSlot(value: Int) = edit { it[BINGWA_SIM_SLOT] = value }
+    suspend fun setAutoReplySimSlot(value: Int) = edit { it[AUTOREPLY_SIM_SLOT] = value }
     suspend fun setHybridPortal(value: Boolean) = edit { it[HYBRID_PORTAL] = value }
     suspend fun setEngageBot(value: Boolean) = edit { it[ENGAGE_BOT] = value }
     suspend fun setProcessingMode(value: ProcessingMode) = edit { it[PROCESSING_MODE] = value.name.lowercase() }
     suspend fun setThemeMode(value: String) = edit { it[THEME_MODE] = value }
     suspend fun setHideAirtime(value: Boolean) = edit { it[HIDE_AIRTIME] = value }
-    suspend fun setSimsNeedAttention(value: Boolean) = edit { it[SIMS_NEED_ATTENTION] = value }
-    suspend fun setAutoRemapSims(value: Boolean) = edit { it[AUTO_REMAP_SIMS] = value }
 
     suspend fun saveAirtimeBalance(balance: Double) = edit {
         it[AIRTIME_BALANCE] = balance
         it[AIRTIME_BALANCE_AT] = System.currentTimeMillis()
-    }
-
-    suspend fun saveBongaBalance(balance: Double) = edit {
-        it[BONGA_BALANCE] = balance
-        it[BONGA_BALANCE_AT] = System.currentTimeMillis()
     }
 
     private suspend fun edit(

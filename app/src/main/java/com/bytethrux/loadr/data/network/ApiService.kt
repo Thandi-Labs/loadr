@@ -27,7 +27,6 @@ data class HomeStatsDto(
     val token_balance: Int,
     val airtime_used: Double,
     val airtime_balance: Double,
-    val bonga_balance: Double = 0.0,
     val weekly_commission: Double,
     val commission_by_day: List<Double>
 )
